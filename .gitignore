@@ -32,3 +32,4 @@ go.work.sum
 # .vscode/
 HTTP_Server_2
 server.log
+config.json

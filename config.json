@@ -3,10 +3,13 @@
   "logger": {
     "level": "debug",
     "outputPath": "server.log",
-    "appName": "Go_Server: ",
+    "appName": "Nadeau_Fuel_Server: ",
     "format": "text"
   },
   "server": {
     "port" : "8080"
+  },
+  "database": {
+    "dsn": "server=ETIQUETTE2K19\\SQLEXPRESS32;user id=FuelDBWritter;password=Sey|fd??k/Wl4IdO*^^Uu`D8;database=Fuel;encrypt=true;TrustServerCertificate=true"
   }
 }

@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"HTTP_Server_2/internal/config"
+	"Nadeau_Fuel_Server/internal/config"
 	"log"
 	"os"
 )

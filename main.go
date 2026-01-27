@@ -1,9 +1,9 @@
 package main
 
 import (
-	"HTTP_Server_2/internal/config"
-	"HTTP_Server_2/internal/handlers"
-	"HTTP_Server_2/internal/logger"
+	"Nadeau_Fuel_Server/internal/config"
+	"Nadeau_Fuel_Server/internal/handlers"
+	"Nadeau_Fuel_Server/internal/logger"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,9 +22,16 @@ func main() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
-	// 3- Create mux, map routes in the handlers package and init the server
+	// 3- Init DB connection
+	db, err := initDB(appConfig.Database.Dsn)
+	if err != nil {
+		logger.Info(err.Error())
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// 4- Create mux, map routes in the handlers package and init the server
 	mux := http.NewServeMux()
-	handlers.App(mux) //maps all routes
+	handlers.App(mux, db) //maps all routes
 
 	srv := &http.Server{
 		Addr:    ":" + appConfig.Server.Port,

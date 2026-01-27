@@ -1,32 +1,42 @@
 package handlers
 
 import (
-	"HTTP_Server_2/internal/logger"
+	"Nadeau_Fuel_Server/internal/logger"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
+	"path/filepath"
 )
 
 const filepathRoot = "app"
 
-func App(mux *http.ServeMux) {
-	// Register all routes here
-	fileServer := http.FileServer(http.Dir(filepathRoot))
-	apiCfg := apiConfig{} // init the apiconfig struct for the metrics
+var tplLogin = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "login.html")))
+var tplHome = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "home.html")))
+
+var db *sql.DB
+
+func App(mux *http.ServeMux, database *sql.DB) {
+	// Store the database for use in handlers
+	db = database
+
+	//static files
+	assets := http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(filepathRoot, "assets"))))
+	mux.Handle("/assets/", assets)
 
 	//page routes
-	mux.Handle("GET /app/", apiCfg.metricsInc((http.StripPrefix("/app/", fileServer)))) // Serve index.html for /app/
-	mux.HandleFunc("GET /app/test", func(w http.ResponseWriter, r *http.Request) {      //custom handler to beautify urls
-		http.ServeFile(w, r, "app/pages/test.html")
+	mux.HandleFunc("GET /api/health", Health)
+	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/home", requireLogin(homeHandler))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { //root
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
 
-	//API's
-	mux.HandleFunc("GET /api/healthz", Healthz)
-	mux.HandleFunc("POST /api/validate_chirp", validateChirp)
+	//API
 
 	//admin
-	mux.HandleFunc("GET /admin/metrics", apiCfg.getMetrics)
-	mux.HandleFunc("POST /admin/reset", apiCfg.reset)
+
 }
 
 //helpers

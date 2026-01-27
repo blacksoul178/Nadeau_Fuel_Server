@@ -1,0 +1,243 @@
+/* Root and Base Styles */
+:root { 
+    color-scheme: light dark; 
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #181b22;
+    color: white;
+}
+
+/* Container */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.card {
+    width: min(420px, 92vw);
+    background: #464444; 
+    padding: 32px 28px; 
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    text-align: center;
+}
+
+.logo {
+    width: 140px; 
+    height: auto; 
+    margin: 0 auto 18px;
+    display: block;
+}
+
+h2 { 
+    margin: 6px 0 18px; 
+    font-size: 1.25rem; 
+}
+
+h3 {
+    font-size: 1.1rem;
+    margin-top: 0;
+}
+
+/* Forms */
+.field { 
+    text-align: left; 
+    margin-bottom: 12px; 
+}
+
+label { 
+    display: block; 
+    font-size: .9rem; 
+    margin-bottom: 6px; 
+    font-weight: 500;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+    width: 95%; 
+    padding: 10px 12px; 
+    font-size: 1rem;
+    border: none;
+    border-radius: 6px;
+    background-color: #333;
+    color: white;
+    box-sizing: border-box;
+    transition: background-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus {
+    outline: none;
+    background-color: #404040;
+}
+
+/* Buttons */
+button, input[type="submit"], input[type="button"] {
+    width: 100%;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: #0d8bff;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover, input[type="submit"]:hover, input[type="button"]:hover {
+    background: #0a6fd8;
+}
+
+.logout-btn {
+    background-color: #dc3545;
+    width: auto;
+    padding: 10px 20px;
+    margin: 20px 0 0 0;
+}
+
+.logout-btn:hover {
+    background-color: #c82333;
+}
+
+/* Header */
+header {
+    background-color: #464444;
+    padding: 20px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    margin-bottom: 20px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background-color: rgba(255,255,255,0.1);
+    padding: 10px 15px;
+    border-radius: 8px;
+}
+
+/* Role Badge */
+.role-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.role-badge.admin {
+    background-color: #ff6b6b;
+    color: white;
+}
+
+.role-badge.user {
+    background-color: #51cf66;
+    color: white;
+}
+
+/* Admin Section */
+.admin-section {
+    background-color: #464444;
+    border-left: 4px solid #ffc107;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+
+.admin-section nav {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.admin-section a {
+    display: inline-block;
+    background-color: #ffc107;
+    color: #333;
+    padding: 8px 15px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.admin-section a:hover {
+    background-color: #e6b000;
+}
+
+/* Content */
+#content {
+    background-color: #464444;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    margin-bottom: 20px;
+}
+
+/* Filters */
+#filters {
+    margin-top: 20px;
+}
+
+#filters form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#filters label {
+    font-weight: bold;
+}
+
+/* Error Display */
+.error {
+    color: #ff6b6b;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .user-info {
+        width: 100%;
+    }
+    
+    #filters form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #filters select {
+        width: 100%;
+    }
+}

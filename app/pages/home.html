@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB Fuel - Nadeau</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <header>
+        <div>
+            <h1>DB Fuel - Nadeau</h1>
+        </div>
+        <div class="user-info">
+            {{.Username}}
+            <span class="role-badge {{.Role}}">{{.Role}}</span>
+        </div>
+    </header>
+    <br>
+    
+    <section id="content">
+        <h2>Welcome {{.Username}}</h2>
+        
+        {{if .IsAdmin}}
+        <div class="admin-section">
+            <h3>Admin Panel</h3>
+            <p>You have admin access. You can manage:</p>
+            <nav>
+                <a href="/admin">Admin Dashboard</a>
+                <a href="/admin/users">Manage Users</a>
+                <a href="/admin/settings">Settings</a>
+            </nav>
+        </div>
+        {{end}}
+
+        <div id="filters">
+            <form id="filter-form">
+                <label for="garage-filter">Garage:</label>
+                <select id="garage-filter">
+                    <option value="ALL">Tous</option>
+                    <option value="STE-MEL">STE-MEL</option>
+                    <option value="STP-CAM">STP-CAM</option>
+                    <option value="STP-REM">STP-REM</option>
+                    <option value="ST-JEAN">ST-JEAN</option>
+                    <option value="CAP-STE">CAP-STE</option>
+                    <option value="EXTERNE">EXTERNE</option>
+                </select>
+            </form>
+        </div>
+    </section>
+
+    <form action="/logout" method="POST" style="margin-top: 20px;">
+        <button type="submit" class="logout-btn">Logout</button>
+    </form>
+</body>
+</html>
+
+            <label for="start-date">Plage de dates:</label>
+            <input type="date" id="start-date">
+            <input type="date" id="end-date">
+
+            <label for="termine-filter">Terminé:</label>
+            <select id="termine-filter">
+                <option value="">Non assigné</option>
+                <option value="OUI">Oui</option>
+                <option value="NON">Non</option>
+            </select>
+
+            <label for="planifie-filter">Planifié:</label>
+            <select id="planifie-filter">
+                <option value="">Non assigné</option>
+                <option value="OUI">Oui</option>
+                <option value="NON">Non</option>
+            </select>
+
+            <label for="hors-service-filter">Hors Service:</label>
+            <select id="hors-service-filter">
+                <option value="">Non assigné</option>
+                <option value="OUI">Oui</option>
+                <option value="NON">Non</option>
+            </select>
+
+            <label for="search-bar">Recherche:</label>
+            <input type="text" id="search-bar" placeholder="Rechercher dans Travaux ou NoUnite">
+        </form>
+    </section>
+
+    <section id="table-section">
+        <table id="appointments-table" border="1">
+            <thead>
+                <tr>
+                    <th>Garage</th>
+                    <th>Date</th>
+                    <th>Priorité</th>
+                    <th>Travaux</th>
+                    <th>NoUnite</th>
+                    <th>Terminé</th>
+                    <th>Planifié</th>
+                    <th>Hors Service</th>
+                    <th>Commentaire Mécanicien</th>
+                    <th>Commentaire Dispatch</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be dynamically populated here -->
+            </tbody>
+        </table>
+    </section>
+
+    <script>
+        // Fetch data from the server and populate the table
+        function fetchAppointments(filters = {}) {
+        const params = new URLSearchParams(filters);
+
+        fetch('/filter?' + params.toString())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const tableBody = document.querySelector('#appointments-table tbody');
+                tableBody.innerHTML = ''; // Clear existing rows
+
+                // Check if appointments exist and are an array
+                if (!data.rendezvous || !Array.isArray(data.rendezvous)) {
+                    console.error("Invalid data format: 'appointments' is missing or not an array.");
+                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Aucune donnée disponible</td></tr>';
+                    return;
+                }
+
+                data.rendezvous.forEach(app => {
+                    // Determine row and cell classes based on conditions
+                    const horsServiceClass = app.HorsService === 'Oui' ? 'row-red' : '';
+                    const rowGreenClass = app.Termine === 'Oui' ? 'row-green' : '';
+                    const planifieClass = app.Planifie === 'Non' ? 'cell-orange' : '';
+                    const formattedDate = app.Date ? new Date(app.Date).toISOString().split('T')[0] : '';
+
+
+                    const row = `
+                        <tr class="${horsServiceClass || rowGreenClass}">
+                            <td>${app.Garage || ''}</td>
+                            <td>${formattedDate}</td>
+                            <td>${app.Priorite || ''}</td>
+                            <td>${app.Travaux || ''}</td>
+                            <td>${app.NoUnite || ''}</td>
+                            <td>${app.Termine || ''}</td>
+                            <td class="${planifieClass}">${app.Planifie || ''}</td>
+                            <td>${app.HorsService || ''}</td>
+                            <td>${app.CommentaireMecanicien || ''}</td>
+                            <td>${app.CommentaireDispatch || ''}</td>
+                        </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            })
+            .catch(error => {
+                console.error("Error fetching appointments:", error);
+                const tableBody = document.querySelector('#appointments-table tbody');
+                tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Erreur lors du chargement des données</td></tr>';
+            });
+    }
+    
+        // Auto-populate date range inputs with the current week's Sunday and Saturday
+        function setDefaultDateRange() {
+            const today = new Date();
+            const futureDate = new Date(today);
+            futureDate.setDate(today.getDate() + 10); // Add 10 days to the current date
+
+            // Format the dates as YYYY-MM-DD
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            // Set the default values for the date inputs
+            document.getElementById('start-date').value = formatDate(today);
+            document.getElementById('end-date').value = formatDate(futureDate);
+        }
+    
+        // Set up filter form event listener
+        document.getElementById('filter-form').addEventListener('input', () => {
+            const filters = {
+                garage: document.getElementById('garage-filter').value,
+                start_date: document.getElementById('start-date').value,
+                end_date: document.getElementById('end-date').value,
+                termine: document.getElementById('termine-filter').value,
+                planifie: document.getElementById('planifie-filter').value,
+                hors_service: document.getElementById('hors-service-filter').value,
+                search: document.getElementById('search-bar').value.toLowerCase(),
+            };
+            fetchAppointments(filters);
+        });
+    
+        // Initialize table with default data and set default date range
+        window.onload = () => {
+            setDefaultDateRange();
+    
+            // Fetch initial data with default filters
+            const filters = {
+                garage: document.getElementById('garage-filter').value,
+                start_date: document.getElementById('start-date').value,
+                end_date: document.getElementById('end-date').value,
+                termine: document.getElementById('termine-filter').value,
+                planifie: document.getElementById('planifie-filter').value,
+                hors_service: document.getElementById('hors-service-filter').value,
+                search: document.getElementById('search-bar').value.toLowerCase(),
+            };
+            fetchAppointments(filters);
+        };
+    </script>
+</body>
+</html>

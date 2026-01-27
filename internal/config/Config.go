@@ -8,8 +8,9 @@ import (
 )
 
 type AppConfig struct {
-	Server ServerCfg `json:"server"`
-	Logger LoggerCfg `json:"logger"`
+	Server   ServerCfg `json:"server"`
+	Logger   LoggerCfg `json:"logger"`
+	Database DbCfg     `json:"database"`
 
 	// Other configs
 }
@@ -24,6 +25,10 @@ type LoggerCfg struct {
 
 type ServerCfg struct {
 	Port string `json:"port"` //server runs on port
+}
+
+type DbCfg struct {
+	Dsn string `json:"dsn"` //sql connection string
 }
 
 func LoadAppConfig(configPath string) (AppConfig, error) {
