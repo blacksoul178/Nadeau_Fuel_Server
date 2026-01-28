@@ -29,7 +29,17 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// 4- Create mux, map routes in the handlers package and init the server
+	// 4- Initialize secure session manager
+	err = handlers.InitSecureSession(
+		appConfig.Session.SecretKey,
+		appConfig.Session.MaxAgeSecs,
+		appConfig.Session.SecureCookie,
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize secure session: %v", err)
+	}
+
+	// 5- Create mux, map routes in the handlers package and init the server
 	mux := http.NewServeMux()
 	handlers.App(mux, db) //maps all routes
 
@@ -40,6 +50,6 @@ func main() {
 
 	logger.Info(fmt.Sprintf("Server starting on port: %s...", appConfig.Server.Port))
 	log.Printf("Serving on port: %s\n", appConfig.Server.Port)
-	log.Fatal(srv.ListenAndServe())
+	log.Fatal(srv.ListenAndServeTLS("./certs/server.crt", "./certs/server.key"))
 
 }

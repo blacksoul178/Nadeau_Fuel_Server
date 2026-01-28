@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"Nadeau_Fuel_Server/internal/logger"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -57,55 +60,81 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	}, nil
 }
 
-// type apiConfig struct {
-// }
+// /api/chauffeurs
+// GET /api/chauffeurs/all
+func chauffeursAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-// // Admin
-// // func (cfg *apiConfig) getMetrics(w http.ResponseWriter, r *http.Request) { // Shows the metric page
-// // 	w.Header().Add("Content-Type", "text/html; charset=utf-8")
-// // 	w.WriteHeader(http.StatusOK)
-// // 	w.Write([]byte(fmt.Sprintf(
-// // 		`<html>
-// //   <body>
-// //     <h1>Welcome, Chirpy Admin</h1>
-// //     <p>Chirpy has been visited %d times!</p>
-// //   </body>
-// // </html>`, cfg.fileserverHits.Load())))
-// // }
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-// // func (cfg *apiConfig) reset(w http.ResponseWriter, r *http.Request) { //reset the metric counter
-// // 	cfg.fileserverHits.Store(0)
-// // 	w.WriteHeader(http.StatusOK)
-// // 	w.Write([]byte("Hits reset to 0\n"))
-// // }
+	// Test query - get column info first
+	query := `
+SELECT
+    operatorNo,
+    FirstName,
+    LastName,
+    Groupe,
+    startDate
+FROM Fuel.dbo.Chauffeurs
+ORDER BY operatorNo;
+`
 
-// // func (cfg *apiConfig) metricsInc(next http.Handler) http.Handler { //increment the metric counter
-// // 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// // 		cfg.fileserverHits.Add(1)
-// // 		next.ServeHTTP(w, r)
-// // 	})
-// // }
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on chauffeursAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
 
-// // api
-// // func validateChirp(w http.ResponseWriter, r *http.Request) {
-// // 	type validateChirp struct {
-// // 		Body string `json:"body"`
-// // 	}
+	type rowOut struct {
+		OperatorNo string `json:"operatorNo"`
+		Nom        string `json:"Nom"`
+		Groupe     string `json:"Groupe"`
+		StartDate  string `json:"startDate"`
+	}
+	out := make([]rowOut, 0, 256)
 
-// // 	var chirp validateChirp
-// // 	err := json.NewDecoder(r.Body).Decode(&chirp)
-// // 	if err != nil {
-// // 		logger.Info(fmt.Sprintf("Could not validate chirp: %s", err))
-// // 		respondWithError(w, http.StatusBadRequest, "Something went wrong")
-// // 		return
-// // 	}
-// // 	if len(chirp.Body) > 140 {
-// // 		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
-// // 		return
-// // 	}
-// // 	type validResponse struct {
-// // 		Valid bool `json:"valid"`
-// // 	}
-// // 	respondWithJSON(w, http.StatusOK, validResponse{Valid: true})
+	for rows.Next() {
+		var (
+			opNo      sql.NullString
+			firstName sql.NullString
+			lastName  sql.NullString
+			grp       sql.NullString
+			sd        sql.NullString // Changed from sql.NullTime to sql.NullString
+		)
+		if err := rows.Scan(&opNo, &firstName, &lastName, &grp, &sd); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on chauffeursAllHandler: " + err.Error())
+			return
+		}
 
-// // }
+		// Combine first and last names
+		nom := strings.TrimSpace(firstName.String + " " + lastName.String)
+
+		// Trim date to YYYY-MM-DD format (remove time portion if present)
+		startDate := sd.String
+		if len(startDate) > 10 {
+			startDate = startDate[:10]
+		}
+
+		out = append(out, rowOut{
+			OperatorNo: opNo.String,
+			Nom:        nom,
+			Groupe:     grp.String,
+			StartDate:  startDate,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on chauffeursAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}

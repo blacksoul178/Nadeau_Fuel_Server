@@ -5,17 +5,11 @@
 
 body {
     margin: 0;
-    padding: 20px;
+    padding: 10px;
     min-height: 100vh;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     background: #181b22;
     color: white;
-}
-
-/* Container */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
 }
 
 .card {
@@ -80,11 +74,11 @@ select:focus {
 
 /* Buttons */
 button, input[type="submit"], input[type="button"] {
-    width: 100%;
-    padding: 12px;
-    margin-top: 12px;
-    font-size: 1rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;            /* center text inside the button vertically */
+    justify-content: center;
+    height: 26px;                   /* set a consistent height */
+    padding: 0 12px;
     border: none;
     border-radius: 6px;
     background: #0d8bff;
@@ -98,11 +92,19 @@ button:hover, input[type="submit"]:hover, input[type="button"]:hover {
 }
 
 .logout-btn {
-    background-color: #dc3545;
-    width: auto;
-    padding: 10px 20px;
-    margin: 20px 0 0 0;
+  display: inline-flex;
+  align-items: center;            /* center text inside the button vertically */
+  justify-content: center;
+  height: 26px;                   /* set a consistent height */
+  padding: 0 12px;
+  border: 1px solid #04070c;
+  border-radius: 6px;
+  background: #eb172c;
+  color: #0b1f33;
+  font-weight: 600;
+  cursor: pointer;
 }
+
 
 .logout-btn:hover {
     background-color: #c82333;
@@ -111,24 +113,24 @@ button:hover, input[type="submit"]:hover, input[type="button"]:hover {
 /* Header */
 header {
     background-color: #464444;
-    padding: 20px;
+    padding: 10px 20px;
     border-radius: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 10px 30px rgba(0,0,0,.08);
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 header h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1rem;
 }
 
 .user-info {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
     background-color: rgba(255,255,255,0.1);
     padding: 10px 15px;
     border-radius: 8px;
@@ -136,13 +138,14 @@ header h1 {
 
 /* Role Badge */
 .role-badge {
-    display: inline-block;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0b1f33;
+  background: #c7f9cc;   /* default */
 }
+
 
 .role-badge.admin {
     background-color: #ff6b6b;
@@ -241,3 +244,158 @@ header h1 {
         width: 100%;
     }
 }
+
+
+
+/* Layout */
+
+
+.container {
+    width: 100%;
+    margin: 10px auto;     /* centered */
+    padding: 0;       /* symmetrical */
+    box-sizing: border-box;
+}
+
+
+.panel { width: 100%; background: #464444; border: 1px solid #04070c; 
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 20px; flex-wrap: nowrap;
+    width: 100% ;
+    box-sizing: border-box; }
+.panel > div{
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 200px;
+}
+
+.panel input[type="text"],
+.panel select {
+  width: 100%;
+  height: 36px;
+  padding: 6px 8px;
+  border: 1px solid #45484d;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+#count {
+  margin-left: auto;
+  font-weight: 500;
+}
+
+
+.spacer { flex: 1; }
+
+/* Table */
+#data-table { width: 100%; border-collapse: collapse; }
+#data-table th, #data-table td { border: 1px solid #04070c; padding: 8px; vertical-align: top; }
+#data-table thead { background: #464444; }
+#data-table td[contenteditable="true"] { background: #464444; }
+
+/* Chauffeurs Table - Fixed Header with Scrollable Body */
+.panel {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Override: Table panel should be vertical with fixed height */
+.container > .panel:has(#tbl) {
+  flex-direction: column;
+  height: 85vh;
+  overflow: hidden;
+  gap: 0;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
+#tbl {
+  width: 100%;
+  border-collapse: collapse;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#tbl thead {
+  display: block;
+  width: 100%;
+  background: #464444;
+}
+
+#tbl thead tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#tbl tbody {
+  display: block;
+  overflow-y: auto;
+  flex: 1;
+  width: 100%;
+}
+
+#tbl tbody tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#tbl th,
+#tbl td {
+  border: 1px solid #04070c;
+  padding: 10px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: white;
+}
+
+#tbl th {
+  background: #464444;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+}
+
+/* Alternating row colors - light grey over dark */
+#tbl tbody tr:nth-child(odd) {
+  background: #2a2a2a;
+}
+
+#tbl tbody tr:nth-child(even) {
+  background: #3a3a3a;
+}
+
+/* Hover color - adjust this to your preference */
+#tbl tbody tr:hover {
+  background: #4a6fa5;
+  cursor: pointer;
+}
+
+/* Selected row - highlighted with a distinct color */
+#tbl tbody tr.selected {
+  background: #0d6fa5 !important;
+  font-weight: 500;
+}
+
+
+.tabs { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.tab {
+  display: inline-block; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+  background: #fff; color: #111827; text-decoration: none; font-weight: 600;
+}
+.tab:hover { background: #f3f4f6; }
+.tab.active { background: #0b1f33; color: #fff; border-color: #0b1f33; }

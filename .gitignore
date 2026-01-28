@@ -30,6 +30,7 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
-HTTP_Server_2
 server.log
 config.json
+/certs
+app.js

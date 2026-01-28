@@ -11,5 +11,10 @@
   },
   "database": {
     "dsn": "server=ETIQUETTE2K19\\SQLEXPRESS32;user id=FuelDBWritter;password=Sey|fd??k/Wl4IdO*^^Uu`D8;database=Fuel;encrypt=true;TrustServerCertificate=true"
+  },
+  "session": {
+    "secretKey": "12IAHZGeWzRehDqBwI7ogFL7pTkYckRKo9UjcEzkOco=",
+    "maxAgeSecs": 86400,
+    "secureCookie": false
   }
 }

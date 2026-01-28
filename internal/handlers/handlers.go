@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"Nadeau_Fuel_Server/internal/logger"
+	"Nadeau_Fuel_Server/internal/session"
+	"encoding/base64"
 	"net/http"
-	"strings"
 )
 
 // SessionInfo holds the parsed session cookie data
@@ -12,21 +13,37 @@ type SessionInfo struct {
 	Role     string
 }
 
-// GetSessionInfo parses the session cookie and returns the user info
+var sessionManager *session.Manager
+var csrfManager *session.CSRFManager
+
+// InitSecureSession initializes the secure session manager
+func InitSecureSession(secretKey string, maxAgeSecs int, secureCookie bool) error {
+	// Decode the base64 secret key
+	decodedKey, err := base64.StdEncoding.DecodeString(secretKey)
+	if err != nil {
+		return err
+	}
+
+	sessionManager = session.NewManager(decodedKey, maxAgeSecs, secureCookie)
+	csrfManager = session.NewCSRFManager()
+	return nil
+}
+
+// GetSessionInfo validates and returns the session data
 func GetSessionInfo(r *http.Request) *SessionInfo {
-	c, err := r.Cookie("session")
-	if err != nil || c.Value == "" {
+	if sessionManager == nil {
 		return nil
 	}
 
-	parts := strings.Split(c.Value, "|")
-	if len(parts) != 2 {
+	data, err := sessionManager.ValidateSession(r)
+	if err != nil {
+		logger.Info("Session validation failed: " + err.Error())
 		return nil
 	}
 
 	return &SessionInfo{
-		Username: parts[0],
-		Role:     parts[1],
+		Username: data.Username,
+		Role:     data.Role,
 	}
 }
 
@@ -37,41 +54,128 @@ func IsAdmin(r *http.Request) bool {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	// Si déjà connecté → home
-	if c, _ := r.Cookie("session"); c != nil && c.Value != "" && r.Method == "GET" {
+	// If already authenticated → home
+	if GetSessionInfo(r) != nil && r.Method == "GET" {
 		http.Redirect(w, r, "/home", http.StatusSeeOther)
 		return
 	}
 
 	switch r.Method {
 	case "GET":
-		_ = tplLogin.Execute(w, nil)
+		// Generate CSRF token for the form
+		token, err := csrfManager.GenerateToken()
+		if err != nil {
+			logger.Info("Failed to generate CSRF token: " + err.Error())
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		csrfManager.SetTokenCookie(w, token)
+
+		_ = tplLogin.Execute(w, map[string]interface{}{
+			"CSRFToken": token,
+		})
+
 	case "POST":
+		// Parse form
+		r.ParseForm()
+
+		// Get and validate CSRF token
+		csrfToken := r.FormValue("csrf_token")
+		if !csrfManager.ValidateToken(csrfToken) {
+			logger.Info("CSRF token validation failed")
+			token, _ := csrfManager.GenerateToken()
+			csrfManager.SetTokenCookie(w, token)
+			_ = tplLogin.Execute(w, map[string]interface{}{
+				"Error":     "Erreur de sécurité: jeton CSRF invalide",
+				"CSRFToken": token,
+			})
+			return
+		}
+
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 
 		user, err := AuthenticateUser(db, username, password)
 		if err != nil {
 			logger.Info("Login failed: " + err.Error())
-			_ = tplLogin.Execute(w, map[string]string{"Error": "Identifiants invalides"})
+			token, _ := csrfManager.GenerateToken()
+			csrfManager.SetTokenCookie(w, token)
+			_ = tplLogin.Execute(w, map[string]interface{}{
+				"Error":     "Identifiants invalides",
+				"CSRFToken": token,
+			})
 			return
 		}
+
 		logger.Info("Login successful for user: " + user.Username)
 
-		// Build cookie value with role information
+		// Create secure session cookie
 		role := "user"
 		if user.IsAdmin {
 			role = "admin"
 		}
-		cookieValue := user.Username + "|" + role
 
-		http.SetCookie(w, &http.Cookie{Name: "session", Value: cookieValue, Path: "/"})
-		logger.Info("Cookie set, redirecting to /home")
+		sessionCookie, err := sessionManager.CreateSession(user.Username, role)
+		if err != nil {
+			logger.Info("Failed to create session: " + err.Error())
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, sessionCookie)
+
+		// Delete CSRF cookie after successful login
+		csrfDeleteCookie := &http.Cookie{
+			Name:     "csrf_token",
+			Value:    "",
+			MaxAge:   -1,
+			Path:     "/",
+			HttpOnly: false,
+		}
+		http.SetCookie(w, csrfDeleteCookie)
+
+		logger.Info("Secure session created, redirecting to /home")
 		http.Redirect(w, r, "/home", http.StatusSeeOther)
 		return
+
 	default:
 		http.Error(w, "Méthode non supportée", http.StatusMethodNotAllowed)
 	}
+}
+
+func logOutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Méthode non supportée", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate CSRF token for logout
+	r.ParseForm()
+	csrfToken := r.FormValue("csrf_token")
+
+	if !csrfManager.ValidateToken(csrfToken) {
+		logger.Info("CSRF token validation failed for logout")
+		http.Error(w, "Erreur de sécurité", http.StatusForbidden)
+		return
+	}
+
+	// Delete the session cookie
+	sessionDeleteCookie := sessionManager.DeleteSession()
+	http.SetCookie(w, sessionDeleteCookie)
+
+	// Delete CSRF cookie
+	csrfDeleteCookie := &http.Cookie{
+		Name:     "csrf_token",
+		Value:    "",
+		MaxAge:   -1,
+		Path:     "/",
+		HttpOnly: false,
+	}
+	http.SetCookie(w, csrfDeleteCookie)
+
+	logger.Info("User logged out successfully")
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -81,10 +185,21 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
 	data := map[string]interface{}{
-		"Username": session.Username,
-		"Role":     session.Role,
-		"IsAdmin":  session.Role == "admin",
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
 	}
 
 	_ = tplHome.Execute(w, data)
@@ -92,12 +207,177 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie("session")
-		if err != nil || c.Value == "" {
-			logger.Info(err.Error())
+		session := GetSessionInfo(r)
+		if session == nil {
+			logger.Info("Authentication required but session invalid")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		next(w, r)
 	}
+}
+
+type PageData struct {
+	Username  string
+	Role      string
+	IsAdmin   bool
+	CSRFToken string
+	ActiveTab string
+}
+
+func chauffeursHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplChauffeurs.Execute(w, data)
+}
+func cartesHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplCartes.Execute(w, data)
+}
+func transactionsHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplTransactions.Execute(w, data)
+}
+func petrolieresHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplPetrolieres.Execute(w, data)
+}
+func vehiculesHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplVehicules.Execute(w, data)
+}
+func brokersHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplBrokers.Execute(w, data)
 }

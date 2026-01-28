@@ -8,11 +8,18 @@ import (
 )
 
 type AppConfig struct {
-	Server   ServerCfg `json:"server"`
-	Logger   LoggerCfg `json:"logger"`
-	Database DbCfg     `json:"database"`
+	Server   ServerCfg  `json:"server"`
+	Logger   LoggerCfg  `json:"logger"`
+	Database DbCfg      `json:"database"`
+	Session  SessionCfg `json:"session"`
 
 	// Other configs
+}
+
+type SessionCfg struct {
+	SecretKey    string `json:"secretKey"`    // Base64-encoded secret key (min 32 bytes)
+	MaxAgeSecs   int    `json:"maxAgeSecs"`   // Session max age in seconds
+	SecureCookie bool   `json:"secureCookie"` // Set to true for HTTPS only
 }
 
 type LoggerCfg struct {
