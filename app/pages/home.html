@@ -20,17 +20,15 @@
         <button type="submit" class="logout-btn">Logout</button>
         </div>
     </form>
-</body>
-</html>
-    </header>
-    <br>
-    
-    <section id="content">
-        <h2>Bienvenue {{.Username}}</h2> 
-        {{if .IsAdmin}}
-        <div class="admin-section">
-            <h3>Admin Panel</h3>
-            <p>You have admin access. You can manage:</p>
+</header>
+<br>
+
+<section id="content">
+    <h2>Bienvenue {{.Username}}</h2> 
+    {{if .IsAdmin}}
+    <div class="admin-section">
+        <h3>Admin Panel</h3>
+        <p>You have admin access. You can manage:</p>
             <nav>
                 <a href="/admin">Admin Dashboard</a>
                 <a href="/admin/users">Manage Users</a>
@@ -39,13 +37,18 @@
         {{end}}
         <h4>Navigation</h4>
         
-<nav class="tabs">
-    <a href="/chauffeurs"    class="tab{{if eq .ActiveTab "chauffeurs"}} active{{end}}">Chauffeurs</a>
+        <nav class="tabs">
+            <a href="/chauffeurs"    class="tab{{if eq .ActiveTab "chauffeurs"}} active{{end}}">Chauffeurs</a>
     <a href="/cartes"        class="tab{{if eq .ActiveTab "cartes"}} active{{end}}">Cartes</a>
     <a href="/transactions"  class="tab{{if eq .ActiveTab "transactions"}} active{{end}}">Transactions</a>
     <a href="/petrolieres"   class="tab{{if eq .ActiveTab "petrolieres"}} active{{end}}">Pétrolières</a>
     <a href="/vehicules"     class="tab{{if eq .ActiveTab "vehicules"}} active{{end}}">Véhicules</a>
     <a href="/brokers"       class="tab{{if eq .ActiveTab "brokers"}} active{{end}}">Compagnies Broker</a>
-  </nav>
+</nav>
 
-    </section>
+</section>
+
+
+
+</body>
+</html>

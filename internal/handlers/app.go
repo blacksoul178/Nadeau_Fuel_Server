@@ -32,7 +32,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("/assets/", assets)
 
 	//page routes
-	mux.HandleFunc("GET /api/health", Health)
+	mux.HandleFunc("GET /health", Health)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logOutHandler)
 	mux.HandleFunc("/home", requireLogin(homeHandler))
@@ -47,19 +47,21 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	})
 
 	//for development only
-	mux.HandleFunc("/build/chauffeurs.html", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/build/vehicules.html", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
 		w.Header().Del("ETag")
 		w.Header().Del("Last-Modified")
 
-		var homePath = filepath.Join(filepathRoot, "pages", "chauffeurs.html") // For Dev Only
+		var homePath = filepath.Join(filepathRoot, "pages", "vehicules.html") // For Dev Only
 		http.ServeFile(w, r, homePath)
 	})
 
 	//API
 	mux.Handle("GET /api/chauffeurs/all", requireLogin(http.HandlerFunc(chauffeursAllHandler)))
+	mux.Handle("GET /api/petrolieres/all", requireLogin(http.HandlerFunc(petrolieresAllHandler)))
+	mux.Handle("GET /api/vehicules/all", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
 	//admin
 
 }

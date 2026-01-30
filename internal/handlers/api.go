@@ -138,3 +138,143 @@ ORDER BY operatorNo;
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
+func petrolieresAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT
+    OilCoName,
+	Compte
+FROM Fuel.dbo.OilCo
+ORDER BY OilCoName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on petrolieresAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		OilCoName string `json:"OilCoName"`
+		Compte    string `json:"Compte"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			OilCoName sql.NullString
+			Compte    sql.NullString
+		)
+		if err := rows.Scan(&OilCoName, &Compte); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on petrolieresAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			OilCoName: OilCoName.String,
+			Compte:    Compte.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on petrolieresAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func vehiculesAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT unitNumber
+    ,unitLicenceNumber
+	,IsUsable
+	,UnitDescription
+	,unitIsIFTAPlated
+	,unitProvince
+	,unitFuelType
+	,GL
+	,NomCommunGl
+FROM Fuel.dbo.unitListWithGL
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on vehiculesAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		UnitNumber       string `json:"unitNumber"`
+		Plaque           string `json:"unitLicenceNumber"`
+		IsUsable         bool   `json:"isUsable"`
+		UnitDescription  string `json:"unitDescription"`
+		UnitIsIFTAPlated string `json:"unitIsIFTAPlated"`
+		UnitProvince     string `json:"unitProvince"`
+		UnitFuelType     string `json:"unitFuelType"`
+		Gl               string `json:"GL"`
+		NomCommunGL      string `json:"nomCommunGL"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			UnitNumber       sql.NullString
+			Plaque           sql.NullString
+			IsUsable         sql.NullBool
+			UnitDescription  sql.NullString
+			UnitIsIFTAPlated sql.NullString
+			UnitProvince     sql.NullString
+			UnitFuelType     sql.NullString
+			Gl               sql.NullString
+			NomCommunGL      sql.NullString
+		)
+		if err := rows.Scan(&UnitNumber, &Plaque, &IsUsable, &UnitDescription, &UnitIsIFTAPlated, &UnitProvince, &UnitFuelType, &Gl, &NomCommunGL); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on vehiculesAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			UnitNumber:       UnitNumber.String,
+			Plaque:           Plaque.String,
+			IsUsable:         IsUsable.Bool,
+			UnitDescription:  UnitDescription.String,
+			UnitIsIFTAPlated: UnitIsIFTAPlated.String,
+			UnitProvince:     UnitProvince.String,
+			UnitFuelType:     UnitFuelType.String,
+			Gl:               Gl.String,
+			NomCommunGL:      NomCommunGL.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on vehiculesAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}

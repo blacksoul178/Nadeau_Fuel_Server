@@ -20,18 +20,16 @@
         <button type="submit" class="logout-btn">Logout</button>
         </div>
     </form>
-</body>
-</html>
-    </header>
-    <br>
-    
-    <section id="content">
-        <h2>Bienvenue {{.Username}}</h2> 
-        {{if .IsAdmin}}
-        <div class="admin-section">
-            <h3>Admin Panel</h3>
-            <p>You have admin access. You can manage:</p>
-            <nav>
+</header>
+<br>
+
+<section id="content">
+    <h2>Bienvenue {{.Username}}</h2> 
+    {{if .IsAdmin}}
+    <div class="admin-section">
+        <h3>Admin Panel</h3>
+        <p>You have admin access. You can manage:</p>
+        <nav>
                 <a href="/admin">Admin Dashboard</a>
                 <a href="/admin/users">Manage Users</a>
             </nav>
@@ -46,5 +44,10 @@
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
     <a href="/brokers"       class="tab">Compagnies Broker</a>
-  </nav>
+</nav>
 </section>
+
+
+
+</body>
+</html>

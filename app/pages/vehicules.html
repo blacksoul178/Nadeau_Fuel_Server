@@ -20,9 +20,7 @@
         <button type="submit" class="logout-btn">Logout</button>
         </div>
     </form>
-</body>
-</html>
-    </header>
+  </header>
     <br>
     
     <section id="content">
@@ -48,3 +46,231 @@
     <a href="/brokers"       class="tab">Compagnies Broker</a>
   </nav>
 </section>
+
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+        <div>
+      <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Mack">
+            </div>
+        <div>
+      <label for="f-actif">Actif?</label>
+      <select id="f-actif">
+        <option value="true">Oui</option>
+        <option value="false">Non</option>
+        <option value="">Tous</option>
+      </select>
+      </div>
+      <div>
+        <label for="f-IFTA">IFTA?</label>
+      <select id="f-IFTA">
+        <option value="null">Tous</option>
+        <option value="true">Oui</option>
+        <option value="false">Non</option>
+      </select>
+      </div>
+      <div>
+        <label for="f-fuel">Fuel?</label>
+      <select id="f-fuel">
+        <option value="">Tous</option>
+        <option value="Diesel">Diesel</option>
+        <option value="Gasoline">Gasoline</option>
+        <option value="None">Aucun</option>
+      </select>
+      </div>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th># Unité</th>
+            <th>Plaque</th>
+            <th>Actif?</th>
+            <th>Description</th>
+            <th>IFTA</th>
+            <th>Province</th>
+            <th>Fuel</th>
+            <th>GL</th>
+            <th>Nom GL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+
+<script>
+    const state = { data: [],
+      filtered: [],
+      debounceTimer: null
+     };
+
+
+    
+    
+    function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
+      if (typeof v === 'boolean') return v;
+      if (v == null) return null;
+      const s = String(v).trim().toLowerCase();
+      if (['true', '1', 'oui', 'yes'].includes(s)) return true;
+      if (['false', '0', 'non', 'no'].includes(s)) return false;
+      return null; // inconnu
+    }
+
+
+
+    // Fetch ALL once (small table)
+    async function loadAll() {
+      const res = await fetch('/api/vehicules/all', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      
+      state.data = await res.json();
+
+            // Pré-calcul du haystack de recherche et normalisation des champs
+            state.data = state.data.map(r => {
+              // Tolérer les variations de casse/typo sur nomCommunGl
+              const nomCommunGL = r.nomCommunGL ?? '';
+              const unitNumber = r.unitNumber ?? '';
+              const unitLicenceNumber = r.unitLicenceNumber ?? '';
+              const unitDescription = r.unitDescription ?? '';
+              const unitProvince = r.unitProvince ?? '';
+              const gl = r.GL ?? r.gl ?? '';
+              const unitIsIFTAPlatedBool = parseBoolLoose(r.unitIsIFTAPlated);
+
+              const haystack = [
+                unitNumber,
+                nomCommunGL,
+                unitLicenceNumber,
+                unitDescription,
+                unitProvince,
+                gl
+              ].join(' ').toLowerCase();
+
+              return {
+                ...r,
+                nomCommunGL,
+                unitNumber,
+                unitLicenceNumber,
+                unitDescription,
+                unitProvince,
+                GL: gl,
+                unitIsIFTAPlated: unitIsIFTAPlatedBool,
+                _haystack: haystack
+              };
+            });
+          }
+
+
+    
+    // Debounce helper
+      function debounce(fn, wait = 250) {
+        return function(...args) {
+          clearTimeout(state.debounceTimer);
+          state.debounceTimer = setTimeout(() => fn.apply(this, args), wait);
+        };
+      }
+
+
+    // Apply client-side filter
+    
+      function applyFilter() {
+        const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+        const actif = parseBoolLoose((document.getElementById('f-actif').value || ''));
+        const IFTA = parseBoolLoose((document.getElementById('f-IFTA').value || ''));
+        const fuel = (document.getElementById('f-fuel').value || '');
+
+        let rows = state.data;
+
+        if (search) {
+          rows = rows.filter(r => r._haystack.includes(search));
+        }
+
+        if (actif !== null) {
+          // r.isUsable supposé booléen (true/false)
+          rows = rows.filter(r => (r.isUsable) === actif);
+        }
+
+        if (IFTA !== null) {
+          // r.unitIsIFTAPlated supposé booléen (true/false)
+          rows = rows.filter(r => (r.unitIsIFTAPlated) === IFTA);
+        }
+
+        if (fuel) {
+          rows = rows.filter(r => (r.unitFuelType ?? '') === fuel);
+        }
+
+        render(rows);
+      }
+
+
+    // Render table
+    
+      function render(rows) {
+            const tb = document.querySelector('#tbl tbody');
+            tb.innerHTML = '';
+
+            const frag = document.createDocumentFragment();
+
+            rows.forEach(r => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>${r.unitNumber ?? ''}</td>
+                <td>${r.unitLicenceNumber ?? ''}</td>
+                <td>${r.isUsable === true ? 'Oui' : r.isUsable === false ? 'Non' : ''}</td>
+                <td>${r.unitDescription ?? ''}</td>
+                <td>${r.unitIsIFTAPlated === true ? 'Oui' : r.unitIsIFTAPlated === false ? 'Non' : ''}</td>
+                <td>${r.unitProvince ?? ''}</td>
+                <td>${r.unitFuelType ?? ''}</td>
+                <td>${r.GL ?? ''}</td>
+                <td>${r.nomCommunGL ?? ''}</td>
+              `;
+              frag.appendChild(tr);
+            });
+
+            tb.appendChild(frag);
+
+            const count = rows.length;
+            document.getElementById('count').textContent = count + (count > 1 ? ' résultats' : ' résultat');
+          }
+
+
+    
+        // Event delegation for row selection (avoids N listeners)
+          function setupRowSelection() {
+            const tb = document.querySelector('#tbl tbody');
+            tb.addEventListener('click', function (e) {
+              const tr = e.target.closest('tr');
+              if (tr) tr.classList.toggle('selected');
+            });
+          }
+
+
+    // Init
+    (async function init() {
+      try {
+        await loadAll();
+        applyFilter();
+        setupRowSelection();
+        // Debounced search input
+        const debouncedFilter = debounce(applyFilter, 250);
+        document.getElementById('f-search').addEventListener('input', debouncedFilter);
+        document.getElementById('f-actif').addEventListener('change', applyFilter);
+        document.getElementById('f-IFTA').addEventListener('change', applyFilter);
+        document.getElementById('f-fuel').addEventListener('change', applyFilter);
+      } catch (e) {
+        alert('Erreur chargement: ' + e.message);
+      }
+    })();
+  </script>
+</body>
+
+
+
+
+</html>

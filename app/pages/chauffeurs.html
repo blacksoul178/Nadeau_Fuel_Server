@@ -20,9 +20,8 @@
         <button type="submit" class="logout-btn">Logout</button>
         </div>
     </form>
+  </header>
 </body>
-</html>
-    </header>
     <br>
     
     <section id="content">
@@ -98,10 +97,19 @@
     // Apply client-side filter
     function applyFilter() {
       const name = (document.getElementById('f-name').value || '').trim().toLowerCase();
-      const grp  = (document.getElementById('f-group').value || '').trim();
+      const grp  = (document.getElementById('f-group').value || '');
 
       let rows = state.data;
-      if (name) rows = rows.filter(r => (r.Nom || '').toLowerCase().includes(name));
+      
+      if (name) {
+        rows = rows.filter(r => {
+          const combined = `${r.Nom ?? ''} ${r.operatorNo ?? ''}`  // combine both
+            .toString()
+            .toLowerCase();
+          return combined.includes(name);
+        });
+      }
+
       if (grp)  rows = rows.filter(r => (r.Groupe || '') === grp);
 
       render(rows);
@@ -146,4 +154,7 @@
     })();
   </script>
 </body>
+
+
+
 </html>
