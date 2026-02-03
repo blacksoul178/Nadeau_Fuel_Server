@@ -47,21 +47,25 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	})
 
 	//for development only
-	mux.HandleFunc("/build/vehicules.html", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/build/brokers.html", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
 		w.Header().Del("ETag")
 		w.Header().Del("Last-Modified")
 
-		var homePath = filepath.Join(filepathRoot, "pages", "vehicules.html") // For Dev Only
+		var homePath = filepath.Join(filepathRoot, "pages", "brokers.html") // For Dev Only
 		http.ServeFile(w, r, homePath)
 	})
 
-	//API
+	//Get API
 	mux.Handle("GET /api/chauffeurs/all", requireLogin(http.HandlerFunc(chauffeursAllHandler)))
 	mux.Handle("GET /api/petrolieres/all", requireLogin(http.HandlerFunc(petrolieresAllHandler)))
 	mux.Handle("GET /api/vehicules/all", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
+	mux.Handle("GET /api/brokers/all", requireLogin(http.HandlerFunc(brokersAllHandler)))
+
+	//Post API
+	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
 	//admin
 
 }

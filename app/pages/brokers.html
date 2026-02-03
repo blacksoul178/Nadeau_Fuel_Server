@@ -46,8 +46,197 @@
     <a href="/brokers"       class="tab active">Compagnies Broker</a>
 </nav>
 </section>
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+          <label for="Ajout Chauffeur">Ajout Chauffeur Broker</label>
+          <div>
+            <label for="BrokerCo">Compagnie broker</label>
+            <select name="BrokerCo" id="brokerCo">
+
+            </select>
+          </div>
+          <div>
+            <label for="Compagnie facturable">Compagnie facturable</label>
+            <select name="Compagnie Facturable" id="dispatchGroup">
+              <option value="1">TGN</option>
+              <option value="2">TMC</option>
+            </select>
+            </div>
+            <div>
+            <label for="Date de début">Date de début</label>
+          <input type="date" name="dateDeDépart" id="startDate">
+          </div>
+          <button type="submit" class="AjouterChauffeur">Ajouter</button>
+
+    </section>
+
+  </main>
+
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+        <div>
+      <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Robert">
+      </div>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th>Id</th>
+            <th>Nom Commun</th>
+            <th>Nom Légal</th>
+            <th>Acomba</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
 
 
+
+<script>
+ const state = { data: [] };
+
+    // Fetch ALL once (small table)
+    async function loadAll() {
+      const res = await fetch('/api/brokers/all', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      state.data = await res.json();
+
+      // Populate broker selector after loading
+      populateBrokerSelect(state.data);
+    }
+
+    // Populate broker <select> with options
+    function populateBrokerSelect(brokers) {
+      const sel = document.getElementById('brokerCo');
+      sel.innerHTML = '';
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = '--- Sélectionner une compagnie ---';
+      sel.appendChild(ph);
+
+      // Sort alphabetically by Nom_Commun
+      brokers.sort((a, b) => (a.Nom_Commun || '').localeCompare(b.Nom_Commun || ''));
+      brokers.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id; // Use id (from JSON)
+        opt.textContent = b.Nom_Commun || '';
+        sel.appendChild(opt);
+      });
+    }
+
+    // Apply client-side filter
+    function applyFilter() {
+      const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+      
+      let rows = state.data;
+      if (search) rows = rows.filter(r => (r.Nom_Commun || '').toLowerCase().includes(search));
+      
+      render(rows);
+    }
+
+    // Render table
+    function render(rows) {
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r.id ?? ''}</td>
+          <td>${r.Nom_Commun ?? ''}</td>
+          <td>${r.Nom_Legal ?? ''}</td>
+          <td>${r.Acomba ?? ''}</td>
+          `;
+          // Add click listener to toggle selection
+        tr.addEventListener('click', function() {
+          this.classList.toggle('selected');
+        });
+        tb.appendChild(tr);
+      });
+      document.getElementById('count').textContent = rows.length + ' résultat(s)';
+    }
+
+    // Helper to read cookie by name
+    function getCookie(name) {
+      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return v ? v.pop() : '';
+    }
+
+    // Add broker driver - submit handler
+    async function addBrokerDriver() {
+      const sel = document.getElementById('brokerCo');
+      const brokerId = sel.value;
+      const brokerName = sel.options[sel.selectedIndex]?.text || '';
+      const dispatchGroup = document.getElementById('dispatchGroup').value;
+      const startDate = document.getElementById('startDate').value;
+
+      if (!brokerId) { alert('Veuillez sélectionner une compagnie broker.'); return; }
+      if (!startDate) { alert('Veuillez sélectionner une date de début.'); return; }
+
+      const payload = {
+        brokerId: Number(brokerId),
+        brokerName: brokerName,
+        dispatchGroup: Number(dispatchGroup),
+        startDate: startDate
+      };
+
+      const btn = document.querySelector('.AjouterChauffeur');
+      btn.disabled = true;
+      btn.textContent = 'Ajout...';
+
+      try {
+        const csrf = getCookie('csrf_token');
+        const res = await fetch('/api/drivers/add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        alert('Chauffeur broker ajouté avec succès ✅');
+        // Reset form
+        sel.value = '';
+        document.getElementById('dispatchGroup').value = '1';
+        document.getElementById('startDate').value = '';
+
+        // Optionally you can reload the page or refresh drivers list if you implement it
+      } catch (e) {
+        alert('Erreur ajout: ' + (e.message || e));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ajouter';
+      }
+    }
+
+    // Init
+    (async function init() {
+      try {
+        await loadAll();
+        applyFilter();
+        document.getElementById('f-search').addEventListener('input', applyFilter);
+        document.querySelector('.AjouterChauffeur').addEventListener('click', addBrokerDriver);
+      } catch (e) {
+        alert('Erreur chargement: ' + e.message);
+      }
+    })();
+    </script>
 
 </body>
 </html>

@@ -6,7 +6,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -277,4 +280,232 @@ FROM Fuel.dbo.unitListWithGL
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
+}
+func brokersAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT id, Nom_Commun, Nom_Legal, Acomba
+FROM Fuel.dbo.BrokerCo
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on brokersAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Id         int    `json:"id"`
+		Nom_Commun string `json:"Nom_Commun"`
+		Nom_Legal  string `json:"Nom_Legal"`
+		Acomba     string `json:"Acomba"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Id         sql.NullInt32
+			Nom_Commun sql.NullString
+			Nom_Legal  sql.NullString
+			Acomba     sql.NullString
+		)
+		if err := rows.Scan(&Id, &Nom_Commun, &Nom_Legal, &Acomba); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on brokersAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Id:         int(Id.Int32),
+			Nom_Commun: Nom_Commun.String,
+			Nom_Legal:  Nom_Legal.String,
+			Acomba:     Acomba.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on brokersAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Parse request JSON (includes optional csrf token in body)
+	type reqBody struct {
+		BrokerId      int    `json:"brokerId"`
+		BrokerName    string `json:"brokerName"`
+		DispatchGroup int    `json:"dispatchGroup"`
+		StartDate     string `json:"startDate"`
+		CSRF          string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+
+	// Read raw body for diagnostics
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on brokersAddDriver: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	logger.Info("brokersAddDriver raw body: " + string(b))
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on brokersAddDriver: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	logger.Info(fmt.Sprintf("brokersAddDriver parsed body: brokerId=%d brokerName=%q dispatchGroup=%d startDate=%q", body.BrokerId, body.BrokerName, body.DispatchGroup, body.StartDate))
+
+	// Determine CSRF token: header -> body -> cookie
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to brokersAddDriver")
+		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		return
+	}
+
+	// Generate and set a fresh token for subsequent requests
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	} else {
+		logger.Info("Failed to generate CSRF token after brokersAddDriver: " + err.Error())
+	}
+
+	if body.BrokerId <= 0 || strings.TrimSpace(body.BrokerName) == "" {
+		respondWithError(w, http.StatusBadRequest, "invalid broker payload")
+		return
+	}
+	if body.StartDate == "" {
+		respondWithError(w, http.StatusBadRequest, "startDate required")
+		return
+	}
+
+	// Start transaction
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on brokersAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Verify broker exists
+	var existingName sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT Nom_Commun FROM Fuel.dbo.BrokerCo WHERE id = @id`, sql.Named("id", body.BrokerId)).Scan(&existingName); err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusBadRequest, "broker not found")
+			return
+		}
+		logger.Info("Query error on brokersAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	// Determine next LastName (numeric suffix)
+	var maxSuffix sql.NullInt64
+	// Use TRY_CAST to safely convert LastName to int; unsupported DB will return NULL and ISNULL will give 0
+	if err := tx.QueryRowContext(ctx, `
+		SELECT ISNULL(MAX(TRY_CAST(LastName AS INT)), 0) FROM Fuel.dbo.Drivers WHERE FirstName = @fname
+	`, sql.Named("fname", body.BrokerName)).Scan(&maxSuffix); err != nil {
+		logger.Info("Query error on brokersAddDriver (max suffix): " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	next := 1
+	if maxSuffix.Valid {
+		next = int(maxSuffix.Int64) + 1
+	}
+	lastName := strconv.Itoa(next)
+	operatorNo := strings.TrimSpace(body.BrokerName + " " + lastName)
+
+	// Insert driver and return new ID using OUTPUT
+	insertQ := `
+	SET NOCOUNT ON;
+	INSERT INTO Fuel.dbo.Drivers (operatorNo, FirstName, LastName, FK_DispatchGroup, startDate, isBroker, FK_BrokerId)
+	OUTPUT INSERTED.id
+	VALUES (@operatorNo, @FirstName, @LastName, @FK_DispatchGroup, @startDate, @isBroker, @FK_BrokerId);
+	`
+	var newId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, insertQ,
+		sql.Named("operatorNo", operatorNo),
+		sql.Named("FirstName", body.BrokerName),
+		sql.Named("LastName", lastName),
+		sql.Named("FK_DispatchGroup", body.DispatchGroup),
+		sql.Named("startDate", body.StartDate),
+		sql.Named("isBroker", 1),
+		sql.Named("FK_BrokerId", body.BrokerId),
+	).Scan(&newId); err != nil {
+		logger.Info("Insert error on brokersAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	logger.Info(fmt.Sprintf("brokersAddDriver inserted id (tx): %v", newId))
+
+	// Verify insertion
+	var verifyId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.Drivers WHERE operatorNo = @op AND FK_BrokerId = @bid ORDER BY id DESC`, sql.Named("op", operatorNo), sql.Named("bid", body.BrokerId)).Scan(&verifyId); err != nil {
+		if err == sql.ErrNoRows {
+			logger.Info("Verification select: no rows found after insert for operatorNo=" + operatorNo)
+		} else {
+			logger.Info("Verification select error on brokersAddDriver: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "database error")
+			return
+		}
+	} else {
+		logger.Info(fmt.Sprintf("Verification select found id: %v", verifyId))
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on brokersAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	res := map[string]interface{}{
+		"id":         nil,
+		"operatorNo": operatorNo,
+		"firstName":  body.BrokerName,
+		"lastName":   lastName,
+	}
+	if newId.Valid {
+		res["id"] = int(newId.Int64)
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
 }
