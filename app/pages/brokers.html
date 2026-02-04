@@ -53,7 +53,6 @@
           <div>
             <label for="BrokerCo">Compagnie broker</label>
             <select name="BrokerCo" id="brokerCo">
-
             </select>
           </div>
           <div>
@@ -68,9 +67,27 @@
           <input type="date" name="dateDeDépart" id="startDate">
           </div>
           <button type="submit" class="AjouterChauffeur">Ajouter</button>
-
     </section>
+  </main>
 
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+          <label for="Ajout Compagnie Broker">Ajout Compagnie Broker</label>
+          <div>
+            <label for="f-addBrokerCoCommonName">Nom Commmun</label>
+            <input type="text" id="addBrokerCoCommonName" placeholder="ex.: Robert Transport">
+          </div>
+          <div>
+            <label for="f-addBrokerCoLegalName">Nom Legal</label>
+            <input type="text" id="addBrokerCoLegalName" placeholder="ex.: 1234-5678 Québec Inc.">
+            </div>
+            <div>
+            <label for="f-addBrokerCoAcomba">Acomba(optionel)</label>
+            <input type="text" id="addBrokerCoAcomba" placeholder="ex.: ABC100">
+          </div>
+          <button type="submit" class="AjouterBrokerCo">Ajouter</button>
+    </section>
   </main>
 
 <main class="container">
@@ -225,6 +242,55 @@
       }
     }
 
+    async function addBrokerCo() {
+
+      const brokerCoCommonName = document.getElementById('addBrokerCoCommonName').value;
+      const brokerCoLegalName = document.getElementById('addBrokerCoLegalName').value;
+      const brokerCoAcomba = document.getElementById('addBrokerCoAcomba').value;
+
+      if (!brokerCoCommonName) { alert('Veuillez entrer un nom commun pour la nouvelle compagnie.'); return; }
+      if (!brokerCoLegalName) { alert('Veuillez entrer un nom légal pour la nouvelle compagnie.'); return; }
+
+      const payload = {
+        brokerCoCommonName: brokerCoCommonName,
+        brokerCoLegalName: brokerCoLegalName,
+        brokerCoAcomba: brokerCoAcomba
+      };
+
+      const btn = document.querySelector('.AjouterBrokerCo');
+      btn.disabled = true;
+      btn.textContent = 'Ajout...';
+
+      try {
+        const csrf = getCookie('csrf_token');
+        const res = await fetch('/api/brokerCo/add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        alert('Nouvelle compagnie broker ajouté avec succès ✅');
+        // Reset form
+        document.getElementById('addBrokerCoCommonName').value = '';
+        document.getElementById('addBrokerCoLegalName').value = '';
+        document.getElementById('addBrokerCoAcomba').value = '';
+        // Optionally you can reload the page or refresh drivers list if you implement it
+      } catch (e) {
+        alert('Erreur ajout: ' + (e.message || e));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ajouter';
+      }
+    }
     // Init
     (async function init() {
       try {
@@ -232,6 +298,7 @@
         applyFilter();
         document.getElementById('f-search').addEventListener('input', applyFilter);
         document.querySelector('.AjouterChauffeur').addEventListener('click', addBrokerDriver);
+        document.querySelector('.AjouterBrokerCo').addEventListener('click', addBrokerCo);
       } catch (e) {
         alert('Erreur chargement: ' + e.message);
       }

@@ -341,7 +341,6 @@ FROM Fuel.dbo.BrokerCo
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
-
 func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -502,6 +501,138 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 		"operatorNo": operatorNo,
 		"firstName":  body.BrokerName,
 		"lastName":   lastName,
+	}
+	if newId.Valid {
+		res["id"] = int(newId.Int64)
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+}
+func brokersAddCo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Parse request JSON (includes optional csrf token in body)
+	type reqBody struct {
+		BrokerCoCommonName string `json:"brokerCoCommonName"`
+		BrokerCoLegalName  string `json:"brokerCoLegalName"`
+		BrokerCoAcomba     string `json:"brokerCoAcomba"`
+		CSRF               string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+
+	// Read raw body for diagnostics
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on brokersAddCo: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	logger.Info("brokersAddCo raw body: " + string(b))
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on brokersAddCo: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	logger.Info(fmt.Sprintf("brokersAddCo parsed body: brokerCoCommonName=%s brokerCoLegalName=%s brokerCoAcomba=%s", body.BrokerCoCommonName, body.BrokerCoLegalName, body.BrokerCoAcomba))
+
+	// Determine CSRF token: header -> body -> cookie
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to brokersAddCo")
+		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		return
+	}
+
+	// Generate and set a fresh token for subsequent requests
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	} else {
+		logger.Info("Failed to generate CSRF token after brokersAddCo: " + err.Error())
+	}
+
+	if len(body.BrokerCoCommonName) == 0 || strings.TrimSpace(body.BrokerCoCommonName) == "" {
+		respondWithError(w, http.StatusBadRequest, "invalid broker Common Name")
+		return
+	}
+	if len(body.BrokerCoLegalName) == 0 {
+		respondWithError(w, http.StatusBadRequest, "invalid broker legal name")
+		return
+	}
+
+	// Start transaction
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on brokersAddCo: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Insert driver and return new ID using OUTPUT
+	insertQ := `
+	SET NOCOUNT ON;
+	INSERT INTO Fuel.dbo.BrokerCo (Nom_Legal, Nom_Commun, Acomba)
+	OUTPUT INSERTED.id
+	VALUES (@Nom_Legal, @Nom_Commun, @Acomba);
+	`
+	var newId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, insertQ,
+		sql.Named("Nom_Legal", body.BrokerCoLegalName),
+		sql.Named("Nom_Commun", body.BrokerCoCommonName),
+		sql.Named("Acomba", body.BrokerCoAcomba),
+	).Scan(&newId); err != nil {
+		logger.Info("Insert error on brokersAddCo: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	logger.Info(fmt.Sprintf("brokersAddCo inserted id (tx): %v", newId))
+
+	// Verify insertion
+	var verifyId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.BrokerCo WHERE Nom_Legal = @nl and Nom_Commun = @nc and Acomba = @A`, sql.Named("nl", body.BrokerCoLegalName), sql.Named("nc", body.BrokerCoCommonName), sql.Named("A", body.BrokerCoAcomba)).Scan(&verifyId); err != nil {
+		if err == sql.ErrNoRows {
+			logger.Info("Verification select: no rows found after insert for Nom_Commun" + body.BrokerCoCommonName)
+		} else {
+			logger.Info("Verification select error on brokersAddCo: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "database error")
+			return
+		}
+	} else {
+		logger.Info(fmt.Sprintf("Verification select found id: %v", verifyId))
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on brokersAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	res := map[string]interface{}{
+		"id":                 nil,
+		"brokerCoCommonName": body.BrokerCoCommonName,
+		"brokerCoLegalName":  body.BrokerCoLegalName,
+		"BrokerCoAcomba":     body.BrokerCoAcomba,
 	}
 	if newId.Valid {
 		res["id"] = int(newId.Int64)

@@ -66,6 +66,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 
 	//Post API
 	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
+	mux.Handle("POST /api/brokerCo/add", requireLogin(http.HandlerFunc(brokersAddCo)))
 	//admin
 
 }
