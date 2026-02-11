@@ -5,6 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DB Fuel - Nadeau</title>
     <link rel="stylesheet" href="/assets/style.css">
+    <style>  
+      html {
+        scrollbar-gutter: stable;           /* or: stable both-edges */
+      }
+      
+      #tbl td:nth-child(1), #tbl th:nth-child(1) {
+        width: 5%;
+      }
+      #tbl td:nth-child(2), #tbl th:nth-child(2) {
+        width: 2%;
+      }
+      #tbl td:nth-child(3), #tbl th:nth-child(3) {
+        width: 10%;
+      }
+      #tbl td:nth-child(4), #tbl th:nth-child(4) {
+        width: 2%;
+      }
+      #tbl td:nth-child(5), #tbl th:nth-child(5) {
+        width: 5%;
+        }
+      #tbl td:nth-child(6), #tbl th:nth-child(6) {
+        width: 5%;
+        }
+      #tbl td:nth-child(7), #tbl th:nth-child(7) {
+        width: 5%;
+        }
+      #tbl td:nth-child(8), #tbl th:nth-child(8) {
+        width: 5%;
+        }
+      #tbl td:nth-child(9), #tbl th:nth-child(9) {
+        width: 5%;
+        }
+      #tbl td:nth-child(10), #tbl th:nth-child(10) {
+        width: 2%;
+        }
+      #tbl td:nth-child(11), #tbl th:nth-child(11) {
+        width: 10%;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -18,8 +57,8 @@
         <!-- CSRF Token for logout -->
         <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
         <button type="submit" class="logout-btn">Logout</button>
+        </form>
         </div>
-    </form>
 </header>
 <br>
 
@@ -47,6 +86,227 @@
     <a href="/brokers"       class="tab">Compagnies Broker</a>
 </nav>
 </section>
+
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+        <div>
+      <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Nom, numéro carte, Pétrolière">
+            </div>
+        <div>
+      <label for="f-actif">Actif?</label>
+      <select id="f-actif">
+          <option value="">Tous</option>
+          <option value="true">Oui</option>
+        <option value="false">Non</option>
+      </select>
+      </div>
+      <div>
+      <label for="f-broker">Broker?</label>
+      <select id="f-broker">
+          <option value="">Tous</option>
+        <option value="true">Oui</option>
+        <option value="false">Non</option>
+      </select>
+      </div>
+      <div>
+        <label for="f-dispatchGroup">Groupe</label>
+      <select id="f-dispatchGroup">
+        <option value="">Tous</option>
+        <option value="TGN">TGN</option>
+        <option value="TMC">TMC</option>
+      </select>
+      </div>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Groupe</th>
+            <th># carte</th>
+            <th>NIP</th>
+            <th>Expiration</th>
+            <th>Pétrolière</th>
+            <th>Date remise</th>
+            <th>Date retrait</th>
+            <th>Active</th>
+            <th>Notes</th>
+            <th>Controles</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+
+<script>
+    const state = { data: [],
+      filtered: [],
+      debounceTimer: null
+     };
+
+
+    
+    
+    function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
+      if (typeof v === 'boolean') return v;
+      if (v == null) return null;
+      const s = String(v).trim().toLowerCase();
+      if (['true', '1', 'oui', 'yes'].includes(s)) return true;
+      if (['false', '0', 'non', 'no'].includes(s)) return false;
+      return null; // inconnu
+    }
+
+
+
+    // Fetch ALL once (small table)
+    async function loadAll() {
+      const res = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      
+      state.data = await res.json();
+
+            // Pré-calcul du haystack de recherche et normalisation des champs
+            state.data = state.data.map(r => {
+              // Tolérer les variations de casse/typo sur nomCommunGl
+              const CardId = r.CardId ?? '';
+              const Nom = r.Nom ?? '';
+              const IsBroker = parseBoolLoose(r.IsBroker) ?? '';
+              const Nom_DispatchGroup = r.Nom_DispatchGroup ?? '';
+              const CardNumber = r.CardNumber ?? '';
+              const NIP = r.NIP ?? '';
+              const Expiration = r.Expiration ?? '';
+              const OilCoName = r.OilCoName ?? '';
+              const DateRemise = r.DateRemise ?? '';
+              const DateReprise = r.DateReprise ?? '';
+              const Active = parseBoolLoose(r.Active) ?? '';
+              const Notes = r.Notes ?? '';
+              
+              //const unitIsIFTAPlatedBool = parseBoolLoose(r.unitIsIFTAPlated);
+
+              const haystack = [
+                Nom, CardNumber, OilCoName
+              ].join(' ').toLowerCase();
+
+              return {
+                ...r,
+                CardId,Nom, IsBroker, Nom_DispatchGroup, CardNumber, NIP, Expiration, OilCoName, DateRemise, DateReprise, Active, Notes,
+                _haystack: haystack
+              };
+            });
+          }
+
+
+    
+    // Debounce helper
+      function debounce(fn, wait = 250) {
+        return function(...args) {
+          clearTimeout(state.debounceTimer);
+          state.debounceTimer = setTimeout(() => fn.apply(this, args), wait);
+        };
+      }
+
+
+    // Apply client-side filter
+    
+      function applyFilter() {
+        const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+        const actif = parseBoolLoose((document.getElementById('f-actif').value || ''));
+        const broker = parseBoolLoose((document.getElementById('f-broker').value || ''));
+        const dispatchGroup = (document.getElementById('f-dispatchGroup').value || '');
+
+        let rows = state.data;
+
+        if (search) {
+          rows = rows.filter(r => r._haystack.includes(search));
+        }
+
+        if (actif !== null) {
+          // r.Active supposé booléen (true/false)
+          rows = rows.filter(r => (r.Active) === actif);
+        }
+
+        if (broker !== null) {
+          // r.IsBroker supposé booléen (true/false)
+          rows = rows.filter(r => (r.IsBroker) === broker);
+        }
+
+        if (dispatchGroup) {
+          rows = rows.filter(r => (r.Nom_DispatchGroup ?? '') === dispatchGroup);
+        }
+
+        render(rows);
+      }
+
+
+    // Render table
+    
+      function render(rows) {
+            const tb = document.querySelector('#tbl tbody');
+            tb.innerHTML = '';
+
+            const frag = document.createDocumentFragment();
+
+            rows.forEach(r => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>${r.Nom ?? ''}</td>
+                <td>${r.Nom_DispatchGroup ?? ''}</td>
+                <td>${r.CardNumber ?? ''}</td>
+                <td>${r.NIP ?? ''}</td>
+                <td>${r.Expiration ?? ''}</td>
+                <td>${r.OilCoName ?? ''}</td>
+                <td>${r.DateRemise ?? ''}</td>
+                <td>${r.DateReprise ?? ''}</td>
+                <td>${r.Active ?? ''}</td>
+                <td>${r.Notes ?? ''}</td>
+              `;
+              frag.appendChild(tr);
+            });
+
+            tb.appendChild(frag);
+
+            const count = rows.length;
+            document.getElementById('count').textContent = count + (count > 1 ? ' résultats' : ' résultat');
+          }
+
+
+    
+        // Event delegation for row selection (avoids N listeners)
+          function setupRowSelection() {
+            const tb = document.querySelector('#tbl tbody');
+            tb.addEventListener('click', function (e) {
+              const tr = e.target.closest('tr');
+              if (tr) tr.classList.toggle('selected');
+            });
+          }
+
+
+    // Init
+    (async function init() {
+      try {
+        await loadAll();
+        applyFilter();
+        setupRowSelection();
+        // Debounced search input
+        const debouncedFilter = debounce(applyFilter, 250);
+        document.getElementById('f-search').addEventListener('input', debouncedFilter);
+        document.getElementById('f-actif').addEventListener('change', applyFilter);
+        document.getElementById('f-broker').addEventListener('change', applyFilter);
+        document.getElementById('f-dispatchGroup').addEventListener('change', applyFilter);
+      } catch (e) {
+        alert('Erreur chargement: ' + e.message);
+      }
+    })();
+  </script>
+
 
 
 

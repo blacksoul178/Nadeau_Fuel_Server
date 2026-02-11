@@ -151,10 +151,10 @@ SELECT
     operatorNo,
     FirstName,
     LastName,
-    Groupe,
-    startDate
+    Groupe
 FROM Fuel.dbo.Chauffeurs
-ORDER BY operatorNo;
+where deletedDate = 'None' or deletedDate = ''
+ORDER BY FirstName;
 `
 
 	rows, err := db.QueryContext(ctx, query)
@@ -181,7 +181,7 @@ ORDER BY operatorNo;
 			grp       sql.NullString
 			sd        sql.NullString // Changed from sql.NullTime to sql.NullString
 		)
-		if err := rows.Scan(&opNo, &firstName, &lastName, &grp, &sd); err != nil {
+		if err := rows.Scan(&opNo, &firstName, &lastName, &grp); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on chauffeursAllHandler: " + err.Error())
 			return
@@ -206,6 +206,120 @@ ORDER BY operatorNo;
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
 		logger.Info("Rows error on chauffeursAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func cartesAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT Cardid
+      ,FirstName
+      ,LastName
+      ,isBroker
+      ,Nom_DispatchGroup
+      ,CardNumber
+      ,NIP
+      ,Expiration
+	  ,OilCoName
+      ,DateRemise
+      ,DateReprise
+      ,Active
+      ,notes
+  FROM Fuel.dbo.listCartes
+  order by FirstName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on vehiculesAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		CardId            int    `json:"CardId"`
+		Nom               string `json:"Nom"`
+		IsBroker          bool   `json:"IsBroker"`
+		Nom_DispatchGroup string `json:"Nom_DispatchGroup"`
+		CardNumber        string `json:"CardNumber"`
+		NIP               string `json:"NIP"`
+		Expiration        string `json:"Expiration"`
+		OilCoName         string `json:"OilCoName"`
+		DateRemise        string `json:"DateRemise"`
+		DateReprise       string `json:"DateReprise"`
+		Active            bool   `json:"Active"`
+		Notes             string `json:"notes"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			CardId            sql.NullInt32
+			FirstName         sql.NullString
+			LastName          sql.NullString
+			IsBroker          sql.NullBool
+			Nom_DispatchGroup sql.NullString
+			CardNumber        sql.NullString
+			NIP               sql.NullString
+			Expiration        sql.NullTime
+			OilCoName         sql.NullString
+			DateRemise        sql.NullTime
+			DateReprise       sql.NullTime
+			Active            sql.NullBool
+			Notes             sql.NullString
+		)
+		if err := rows.Scan(
+			&CardId,
+			&FirstName,
+			&LastName,
+			&IsBroker,
+			&Nom_DispatchGroup,
+			&CardNumber,
+			&NIP,
+			&Expiration,
+			&OilCoName,
+			&DateRemise,
+			&DateReprise,
+			&Active,
+			&Notes); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on vehiculesAllHandler: " + err.Error())
+			return
+		}
+
+		// Combine first and last names
+		nom := strings.TrimSpace(FirstName.String + " " + LastName.String)
+
+		out = append(out, rowOut{
+			CardId:            int(CardId.Int32),
+			Nom:               nom,
+			IsBroker:          IsBroker.Bool,
+			Nom_DispatchGroup: Nom_DispatchGroup.String,
+			CardNumber:        CardNumber.String,
+			NIP:               NIP.String,
+			Expiration:        Expiration.Time.Format("02/01/2006"),
+			OilCoName:         OilCoName.String,
+			DateRemise:        DateRemise.Time.Format("02/01/2006"),
+			DateReprise:       DateReprise.Time.Format("02/01/2006"),
+			Active:            Active.Bool,
+			Notes:             Notes.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on vehiculesAllHandler: " + err.Error())
 		return
 	}
 

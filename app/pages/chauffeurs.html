@@ -77,7 +77,6 @@
             <th># Opérateur</th>
             <th>Nom</th>
             <th>Groupe</th>
-            <th>Date Début</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -126,7 +125,6 @@
           <td>${r.operatorNo ?? ''}</td>
           <td>${escapeHtml(r.Nom ?? '')}</td>
           <td>${escapeHtml(r.Groupe ?? '')}</td>
-          <td>${r.startDate ?? ''}</td>
         `;
         // Add click listener to toggle selection
         tr.addEventListener('click', function() {
