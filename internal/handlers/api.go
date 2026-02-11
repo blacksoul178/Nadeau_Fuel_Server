@@ -63,6 +63,77 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	}, nil
 }
 
+// admin
+func syncrunsErrorHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT top (10) run_name
+      ,started_at
+      ,finished_at
+      ,status
+      ,error_message
+  FROM Fuel.dbo.SyncRuns
+  where status != 'SUCCESS'
+  order by started_at desc;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		logger.Info("Query error on syncrunsErrorHandler: " + err.Error())
+		http.Error(w, "query error: "+err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		RunName      string `json:"RunName"`
+		StartedAt    string `json:"StartedAt"`
+		FinishedAt   string `json:"FinishedAt"`
+		Status       string `json:"Status"`
+		ErrorMessage string `json:"ErrorMessage"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			run_name      sql.NullString
+			started_at    sql.NullTime
+			finished_at   sql.NullTime
+			status        sql.NullString
+			error_message sql.NullString // Changed from sql.NullTime to sql.NullString
+		)
+		if err := rows.Scan(&run_name, &started_at, &finished_at, &status, &error_message); err != nil {
+			logger.Info("Scan error on syncrunsErrorHandler: " + err.Error())
+			http.Error(w, "scan error: "+err.Error(), 500)
+			return
+		}
+
+		out = append(out, rowOut{
+			RunName:      run_name.String,
+			StartedAt:    started_at.Time.Format("02/01/2006 15:04"),
+			FinishedAt:   finished_at.Time.Format("02/01/2006 15:04"),
+			Status:       status.String,
+			ErrorMessage: error_message.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		logger.Info("Rows error on syncrunsErrorHandler: " + err.Error())
+		http.Error(w, "rows error: "+err.Error(), 500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
 // /api/chauffeurs
 // GET /api/chauffeurs/all
 func chauffeursAllHandler(w http.ResponseWriter, r *http.Request) {

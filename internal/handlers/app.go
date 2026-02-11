@@ -20,6 +20,7 @@ var tplTransactions = template.Must(template.ParseFiles(filepath.Join(filepathRo
 var tplPetrolieres = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "petrolieres.html")))
 var tplVehicules = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "vehicules.html")))
 var tplBrokers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "brokers.html")))
+var tplSyncruns = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "syncruns.html")))
 
 var db *sql.DB
 
@@ -42,6 +43,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/petrolieres", requireLogin(petrolieresHandler))
 	mux.HandleFunc("/vehicules", requireLogin(vehiculesHandler))
 	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
+	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { //root
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
@@ -68,6 +70,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
 	mux.Handle("POST /api/brokerCo/add", requireLogin(http.HandlerFunc(brokersAddCo)))
 	//admin
+	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsErrorHandler)))
 
 }
 
