@@ -1,279 +1,219 @@
-/* Root and Base Styles */
-:root { 
-    color-scheme: light dark; 
+/* ====================================================================== */
+/*  Base & Reset                                                          */
+/* ====================================================================== */
+
+:root {
+  color-scheme: light dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
-    margin: 0;
-    padding: 10px;
-    min-height: 100vh;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    background: #181b22;
-    color: white;
+  margin: 0;
+  padding: 10px;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #181b22;   /* conserver le thème sombre existant */
+  color: #ffffff;
 }
 
+/* Liens par défaut (si besoin) */
+a {
+  color: #0d8bff;
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
 
+/* Titres */
+h1, h2, h3 {
+  margin: 0 0 12px 0;
+  font-weight: 600;
+  color: #ffffff;
+}
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+
+/* ====================================================================== */
+/*  Cartes / panneaux                                                     */
+/* ====================================================================== */
 
 .card {
-    width: min(420px, 92vw);
-    background: #464444; 
-    padding: 32px 28px; 
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
-    text-align: center;
+  width: min(420px, 92vw);
+  background: #464444;
+  padding: 32px 28px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  text-align: center;
 }
 
 .logo {
-    width: 140px; 
-    height: auto; 
-    margin: 0 auto 18px;
-    display: block;
+  width: 140px;
+  height: auto;
+  margin: 0 auto 18px;
+  display: block;
 }
 
-h2 { 
-    margin: 6px 0 18px; 
-    font-size: 1.25rem; 
+/* Conteneur principal */
+.container {
+  width: 100%;
+  margin: 10px auto;
+  padding: 0;
 }
 
-h3 {
-    font-size: 1.1rem;
-    margin-top: 0;
-}
-
-/* Forms */
-.field { 
-    text-align: left; 
-    margin-bottom: 12px; 
-}
-
-label { 
-    display: block; 
-    font-size: .9rem; 
-    margin-bottom: 6px; 
-    font-weight: 500;
-}
-
-input[type="text"],
-input[type="password"],
-select {
-    width: 95%; 
-    padding: 10px 12px; 
-    font-size: 1rem;
-    border: none;
-    border-radius: 6px;
-    background-color: #333;
-    color: white;
-    box-sizing: border-box;
-    transition: background-color 0.3s;
-}
-
-input[type="text"]:focus,
-input[type="password"]:focus,
-select:focus {
-    outline: none;
-    background-color: #404040;
-}
-
-/* Buttons */
-button, input[type="submit"], input[type="button"] {
-    display: inline-flex;
-    align-items: center;            /* center text inside the button vertically */
-    justify-content: center;
-    height: 26px;                   /* set a consistent height */
-    padding: 0 12px;
-    border: none;
-    border-radius: 6px;
-    background: #0d8bff;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-button:hover, input[type="submit"]:hover, input[type="button"]:hover {
-    background: #0a6fd8;
-}
-
-.logout-btn {
-  display: inline-flex;
-  align-items: center;            /* center text inside the button vertically */
-  justify-content: center;
-  height: 26px;                   /* set a consistent height */
-  padding: 0 12px;
+/* Panneau générique (une seule définition, plus de doublons) */
+.panel {
+  width: 100%;
+  background: #464444;
   border: 1px solid #04070c;
-  border-radius: 6px;
-  background: #eb172c;
-  color: #0b1f33;
-  font-weight: 600;
-  cursor: pointer;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
-
-.logout-btn:hover {
-    background-color: #c82333;
+.panel > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 200px;
 }
 
-/* Header */
+/* ====================================================================== */
+/*  En-tête                                                               */
+/* ====================================================================== */
+
 header {
-    background-color: #464444;
-    padding: 10px 20px;
-    border-radius: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
-    margin-bottom: 10px;
+  background-color: #464444;
+  padding: 10px 20px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  margin-bottom: 10px;
 }
 
 header h1 {
-    margin: 0;
-    font-size: 1rem;
+  margin: 0;
+  font-size: 1rem;
 }
 
 .user-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: rgba(255,255,255,0.1);
-    padding: 10px 15px;
-    border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: rgba(255,255,255,0.1);
+  padding: 10px 15px;
+  border-radius: 8px;
 }
 
-/* Role Badge */
+/* Badges de rôle */
 .role-badge {
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
   color: #0b1f33;
-  background: #c7f9cc;   /* default */
+  background: #c7f9cc;
 }
+.role-badge.admin { background-color: #ff6b6b; color: #ffffff; }
+.role-badge.user  { background-color: #51cf66; color: #ffffff; }
 
+/* ====================================================================== */
+/*  Section Admin                                                         */
+/* ====================================================================== */
 
-.role-badge.admin {
-    background-color: #ff6b6b;
-    color: white;
-}
-
-.role-badge.user {
-    background-color: #51cf66;
-    color: white;
-}
-
-/* Admin Section */
 .admin-section {
-    background-color: #464444;
-    border-left: 4px solid #ffc107;
-    padding: 20px;
-    margin: 20px 0;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  background-color: #464444;
+  border-left: 4px solid #ffc107;
+  padding: 20px;
+  margin: 20px 0;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
 }
 
 .admin-section nav {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .admin-section a {
-    display: inline-block;
-    background-color: #ffc107;
-    color: #333;
-    padding: 8px 15px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: bold;
-    transition: background-color 0.3s;
+  display: inline-block;
+  background-color: #ffc107;
+  color: #333;
+  padding: 8px 15px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background-color 0.2s ease-in-out;
 }
+.admin-section a:hover { background-color: #e6b000; }
 
-.admin-section a:hover {
-    background-color: #e6b000;
-}
+/* ====================================================================== */
+/*  Zone de contenu                                                       */
+/* ====================================================================== */
 
-/* Content */
 #content {
-    background-color: #464444;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
-    margin-bottom: 20px;
+  background-color: #464444;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  margin-bottom: 20px;
 }
 
-/* Filters */
 #filters {
-    margin-top: 20px;
+  margin-top: 20px;
 }
-
 #filters form {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#filters label { font-weight: 600; }
+
+/* ====================================================================== */
+/*  Formulaires                                                           */
+/* ====================================================================== */
+
+.field {
+  text-align: left;
+  margin-bottom: 12px;
 }
 
-#filters label {
-    font-weight: bold;
+label {
+  display: block;
+  font-size: .9rem;
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
-/* Error Display */
-.error {
-    color: #ff6b6b;
-    font-size: 0.9rem;
-    margin-bottom: 12px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    body {
-        padding: 10px;
-    }
-    
-    header {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .user-info {
-        width: 100%;
-    }
-    
-    #filters form {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    #filters select {
-        width: 100%;
-    }
-}
-
-
-
-/* Layout */
-
-
-.container {
-    width: 100%;
-    margin: 10px auto;     /* centered */
-    padding: 0;       /* symmetrical */
-    box-sizing: border-box;
-}
-
-
-.panel { width: 100%; background: #464444; border: 1px solid #04070c; 
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 20px; flex-wrap: nowrap;
-    width: 100% ;
-    box-sizing: border-box; }
-.panel > div{
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 200px;
+input[type="text"],
+input[type="password"],
+select {
+  width: 95%;
+  height: 36px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #333;
+  color: #ffffff;
+  transition: background-color 0.2s ease-in-out;
 }
 
 .panel input[type="text"],
@@ -284,74 +224,85 @@ header h1 {
   border: 1px solid #45484d;
   border-radius: 6px;
   font-size: 14px;
-  box-sizing: border-box;
 }
 
-#count {
-  margin-left: auto;
-  font-weight: 500;
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus {
+  outline: none;
+  background-color: #404040;
 }
 
+/* ====================================================================== */
+/*  Boutons                                                               */
+/* ====================================================================== */
 
-.spacer { flex: 1; }
+button,
+input[type="submit"],
+input[type="button"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: #0d8bff;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out, transform 0.02s ease-in-out;
+}
+button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover {
+  background: #0a6fd8;
+}
+button:active,
+input[type="submit"]:active,
+input[type="button"]:active {
+  transform: translateY(1px);
+}
 
-/* Table */
-#data-table { width: 100%; border-collapse: collapse; }
-#data-table th, #data-table td { border: 1px solid #04070c; padding: 8px; vertical-align: top; }
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid #04070c;
+  border-radius: 6px;
+  background: #eb172c;
+  color: #0b1f33;
+  font-weight: 600;
+  cursor: pointer;
+}
+.logout-btn:hover { background-color: #c82333; }
+
+/* ====================================================================== */
+/*  Table — VERSION SIMPLE (pas de scroll interne)                        */
+/* ====================================================================== */
+
+/* Table par défaut (data-table générique) */
+#data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+#data-table th,
+#data-table td {
+  border: 1px solid #04070c;
+  padding: 8px;
+  vertical-align: top;
+  color: #ffffff;
+}
 #data-table thead { background: #464444; }
 #data-table td[contenteditable="true"] { background: #464444; }
 
-/* Chauffeurs Table - Fixed Header with Scrollable Body */
-.panel {
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-/* Override: Table panel should be vertical with fixed height */
-.container > .panel:has(#tbl) {
-  flex-direction: column;
-  height: 85vh;
-  overflow: hidden;
-  gap: 0;
-  align-items: stretch;
-  flex-wrap: nowrap;
-}
-
+/* ======= Tableau principal #tbl (simplifié) ======= */
+/* IMPORTANT : pas de display:flex/block sur thead/tbody/tr */
 #tbl {
   width: 100%;
   border-collapse: collapse;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-#tbl thead {
-  display: block;
-  width: 100%;
-  background: #464444;
-}
-
-#tbl thead tr {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
-}
-
-#tbl tbody {
-  display: block;
-  overflow-y: auto;
-  flex: 1;
-  width: 100%;
-}
-
-#tbl tbody tr {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
+  table-layout: auto;   /* laisse le navigateur gérer intelligemment */
 }
 
 #tbl th,
@@ -359,45 +310,120 @@ header h1 {
   border: 1px solid #04070c;
   padding: 10px;
   text-align: left;
-  white-space: nowrap;
+  color: #ffffff;
+
+  /* comportement de lecture */
+  white-space: nowrap;       /* ne pas casser les mots par défaut */
   overflow: hidden;
   text-overflow: ellipsis;
-  color: white;
 }
 
 #tbl th {
   background: #464444;
-  font-weight: bold;
-  position: sticky;
-  top: 0;
+  font-weight: 700;
 }
 
-/* Alternating row colors - light grey over dark */
-#tbl tbody tr:nth-child(odd) {
-  background: #2a2a2a;
-}
+/* Lignes alternées */
+#tbl tbody tr:nth-child(odd)  { background: #2a2a2a; }
+#tbl tbody tr:nth-child(even) { background: #3a3a3a; }
 
-#tbl tbody tr:nth-child(even) {
-  background: #3a3a3a;
-}
-
-/* Hover color - adjust this to your preference */
+/* Survol / sélection */
 #tbl tbody tr:hover {
   background: #4a6fa5;
   cursor: pointer;
 }
-
-/* Selected row - highlighted with a distinct color */
 #tbl tbody tr.selected {
   background: #0d6fa5 !important;
   font-weight: 500;
 }
 
+/* ====================================================================== */
+/*  Utilitaires de largeur de colonnes (pour overrides par page)          */
+/*  Applique-les sur <th> et/ou <td> correspondants.                      */
+/*  Ex.: <th class="col-120">...                                          */
+/* ====================================================================== */
 
-.tabs { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.tab {
-  display: inline-block; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;
-  background: #fff; color: #111827; text-decoration: none; font-weight: 600;
+.col-80   { width: 80px; }
+.col-100  { width: 100px; }
+.col-120  { width: 120px; }
+.col-140  { width: 140px; }
+.col-160  { width: 160px; }
+.col-200  { width: 200px; }
+.col-240  { width: 240px; }
+.col-300  { width: 300px; }
+.col-400  { width: 400px; }
+
+/* Versions sémantiques réutilisables */
+.col-small   { width: 80px; }
+.col-medium  { width: 160px; }
+.col-large   { width: 260px; }
+.col-wide    { width: 400px; }
+
+/* Pour forcer un wrap sur certaines colonnes (ex. Notes) */
+.wrap       { white-space: normal; }
+.nowrap     { white-space: nowrap; }
+
+/* ====================================================================== */
+/*  Onglets                                                               */
+/* ====================================================================== */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
 }
-.tab:hover { background: #f3f4f6; }
-.tab.active { background: #0b1f33; color: #fff; border-color: #0b1f33; }
+.tab {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  text-decoration: none;
+  font-weight: 600;
+}
+.tab:hover  { background: #f3f4f6; }
+.tab.active { background: #0b1f33; color: #ffffff; border-color: #0b1f33; }
+
+/* ====================================================================== */
+/*  Divers                                                                */
+/* ====================================================================== */
+
+.error {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+#count {
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.spacer { flex: 1; }
+
+/* ====================================================================== */
+/*  Responsive                                                            */
+/* ====================================================================== */
+
+@media (max-width: 768px) {
+  body { padding: 10px; }
+
+  header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .user-info { width: 100%; }
+
+  #filters form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #filters select { width: 100%; }
+
+  /* En mobile, autoriser le wrap dans les cellules longues si besoin */
+  #tbl th, #tbl td { white-space: normal; }
+}
