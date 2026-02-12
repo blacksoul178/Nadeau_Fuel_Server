@@ -427,3 +427,52 @@ input[type="button"]:active {
   /* En mobile, autoriser le wrap dans les cellules longues si besoin */
   #tbl th, #tbl td { white-space: normal; }
 }
+
+/* Modal styles (confirmation dialog) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modal-box {
+  background: #ffffff; /* light box to contrast dark app background */
+  color: #0b1f33; /* dark text for readability */
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.modal-box h3 { margin-top: 0; color: #0b1f33; }
+.modal-box p { color: #0b1f33; }
+.modal-box input[type="text"], .modal-box input:not([type]) {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b1f33;
+}
+.modal-box button { min-width: 90px; }
+.modal-box button[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* Flash success notification */
+.flash-success {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: #22c55e;
+  color: #042028;
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  z-index: 10000;
+}
+.flash-success.visible { opacity: 1; transform: translateX(-50%) translateY(0); }

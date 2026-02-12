@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DB Fuel - Nadeau</title>
+  <meta name="csrf-token" content="{{.CSRFToken}}">
+    <title>DB Fuel - Cartes</title>
     <link rel="stylesheet" href="/assets/style.css">
     
 </head>
@@ -50,10 +51,60 @@
 </section>
 
 <main class="container">
+    <!-- Ajout de Cartes -->
+    <section class="panel">
+            <label for="Ajout de carde">Ajout de carte</label>
+            <div>
+                <label for="driverName">Nom du chauffeur *</label>
+                <input name="driverName" id="driverName" list="driverList" placeholder="Tapez un nom...">
+                <datalist id="driverList"></datalist>
+                <br>
+                <br>
+                <label for="cardNumber"># Carte *</label>
+                <input type="text" name="cardNumber" id="cardNumber">
+            </div>
+            </div>
+        <div>
+            <div>
+                <label for="Groupe?">Groupe?</label>
+                <select name="Groupe?" id="dispatchGroup">
+                    <option value="1">TGN</option>
+                  <option value="2">TMC</option>
+                </select>
+            </div>
+            <br>
+        <div>
+            <label for="NIP">NIP *</label>
+            <input type="text" name="NIP" id="NIP">
+        </div>
+    </div>
+    <div>
+        <label for="Note">Note</label>
+        <input type="text" name="Note" id="Note">
+        <br>
+        <br>
+        <label for="oilCoName">Pétrolière *</label>
+                <input name="oilCoName" id="oilCoName" list="oilCoList" placeholder="Choisir une Pétrolière">
+                <datalist id="oilCoList"></datalist>
+            </div>
+    <div>
+        <label for="Expiration">Expiration</label>
+        <input type="date" name="Expiration" id="Expiration">
+    <br>
+        <label for="DateRemise">Date de remise</label>
+        <input type="date" name="DateRemise" id="DateRemise">
+    </div>
+    <button type="submit" class="AjouterCarte">Ajouter</button>
+</section>
+  </main>
+  
+
+  
+<main class="container">
     <!-- Filters -->
     <section class="panel">
         <div>
-      <label for="f-search">Recherche</label>
+            <label for="f-search">Recherche</label>
       <input type="text" id="f-search" placeholder="ex.: Nom, numéro carte, Pétrolière">
             </div>
         <div>
@@ -93,8 +144,8 @@
             <th class="col-80">Groupe</th>
             <th class="col-200"># carte</th>
             <th class="col-80">NIP</th>
-            <th class="col-120">Expiration</th>
             <th class="col-120">Pétrolière</th>
+            <th class="col-120">Expiration</th>
             <th class="col-120">Date remise</th>
             <th class="col-120">Date retrait</th>
             <th class="col-80">Active</th>
@@ -109,12 +160,51 @@
 
 
 <script>
+    
     const state = { data: [],
       filtered: [],
       debounceTimer: null
      };
 
 
+
+     
+
+    // Populate broker <select> with options
+    function populateDriverNameSelect(drivers) {
+
+      const input = document.getElementById('driverName');
+      const list = document.getElementById('driverList');
+      if (!input || !list) return;
+      list.innerHTML = '';
+
+      // Collect unique names and sort
+      const names = Array.from(new Set((drivers || []).map(d => (d.Nom || '').trim()).filter(n => n)));
+      names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+      for (const name of names) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        list.appendChild(opt);
+      }
+
+    }
+
+    // Populate oil company datalist from API
+    async function populateOilCoList() {
+      try {
+        const res = await fetch('/api/petrolieres/all', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const list = await res.json();
+        const dl = document.getElementById('oilCoList');
+        if (!dl) return;
+        dl.innerHTML = '';
+        const names = Array.from(new Set((list || []).map(i => (i.OilCoName || '').trim()).filter(n => n)));
+        names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+        for (const name of names) {
+          const opt = document.createElement('option'); opt.value = name; dl.appendChild(opt);
+        }
+      } catch (e) { /* ignore */ }
+    }
     
     
     function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
@@ -134,6 +224,7 @@
       if (!res.ok)throw new Error('HTTP ' + res.status);
       
       state.data = await res.json();
+      populateDriverNameSelect(state.data);
 
             // Pré-calcul du haystack de recherche et normalisation des champs
             state.data = state.data.map(r => {
@@ -144,8 +235,8 @@
               const Nom_DispatchGroup = r.Nom_DispatchGroup ?? '';
               const CardNumber = r.CardNumber ?? '';
               const NIP = r.NIP ?? '';
-              const Expiration = r.Expiration ?? '';
               const OilCoName = r.OilCoName ?? '';
+              const Expiration = r.Expiration ?? '';
               const DateRemise = r.DateRemise ?? '';
               const DateReprise = r.DateReprise ?? '';
               const Active = parseBoolLoose(r.Active) ?? '';
@@ -221,14 +312,18 @@
               tr.innerHTML = `
                 <td>${r.Nom ?? ''}</td>
                 <td>${r.Nom_DispatchGroup ?? ''}</td>
-                <td>${r.CardNumber ?? ''}</td>
-                <td>${r.NIP ?? ''}</td>
-                <td>${r.Expiration ?? ''}</td>
-                <td>${r.OilCoName ?? ''}</td>
-                <td>${r.DateRemise ?? ''}</td>
-                <td>${r.DateReprise ?? ''}</td>
-                <td>${r.Active ?? ''}</td>
-                <td>${r.Notes ?? ''}</td>
+                <td data-field="CardNumber">${r.CardNumber ?? ''}</td>
+                <td class="cell-nip" data-field="NIP" data-cardid="${r.CardId}"><span class="val">${r.NIP ?? ''}</span></td>
+                <td data-field="OilCoName">${r.OilCoName ?? ''}</td>
+                <td data-field="Expiration">${r.Expiration ?? ''}</td>
+                <td class="cell-dr" data-field="DateRemise" data-cardid="${r.CardId}"><span class="val">${r.DateRemise ?? ''}</span></td>
+                <td class="cell-dre" data-field="DateReprise" data-cardid="${r.CardId}"><span class="val">${r.DateReprise ?? ''}</span></td>
+                <td data-field="Active">${r.Active ?? ''}</td>
+                <td data-field="Notes">${r.Notes ?? ''}</td>
+                <td>
+                  <button class="btn-edit" data-cardid="${r.CardId}">Modifier</button>
+                  <button class="btn-delete" data-cardid="${r.CardId}" data-cardnumber="${r.CardNumber}">Supprimer</button>
+                </td>
               `;
               frag.appendChild(tr);
             });
@@ -239,16 +334,160 @@
             document.getElementById('count').textContent = count + (count > 1 ? ' résultats' : ' résultat');
           }
 
+      // Global helper to retrieve CSRF token (meta -> cookie)
+      function getCSRF() {
+        const m = document.querySelector('meta[name="csrf-token"]');
+        if (m && m.content) return m.content;
+        // fallback to cookie
+        const v = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+        if (v) return v.split('=')[1];
+        return '';
+      }
+
 
     
         // Event delegation for row selection (avoids N listeners)
           function setupRowSelection() {
             const tb = document.querySelector('#tbl tbody');
-            tb.addEventListener('click', function (e) {
+            tb.addEventListener('click', async function (e) {
               const tr = e.target.closest('tr');
-              if (tr) tr.classList.toggle('selected');
+              // Row selection
+              if (tr && e.target.tagName !== 'BUTTON') tr.classList.toggle('selected');
+
+              // Edit / Save
+              if (e.target.matches('.btn-edit')) {
+                const btn = e.target;
+                const cardId = btn.dataset.cardid;
+                const row = btn.closest('tr');
+                const nipCell = row.querySelector('.cell-nip .val');
+                const drCell = row.querySelector('.cell-dr .val');
+                const dreCell = row.querySelector('.cell-dre .val');
+                const notesCell = row.querySelector('td[data-field="Notes"]');
+
+                const isEditing = btn.dataset.editing === '1';
+                if (!isEditing) {
+                  // switch to inputs
+                  const nipVal = nipCell ? nipCell.textContent.trim() : '';
+                  let drVal = drCell ? drCell.textContent.trim() : '';
+                    // If empty, prefill with today's date in dd/MM/YYYY for edit inputs
+                    if (!drVal) {
+                      const _t = new Date();
+                      const _dd = String(_t.getDate()).padStart(2, '0');
+                      const _mm = String(_t.getMonth() + 1).padStart(2, '0');
+                      const _yyyy = _t.getFullYear();
+                      drVal = `${_dd}/${_mm}/${_yyyy}`;
+                    }
+                  const dreVal = dreCell ? dreCell.textContent.trim() : '';
+                  const notesVal = notesCell ? notesCell.textContent.trim() : '';
+
+                  if (nipCell) nipCell.parentElement.innerHTML = `<input class="inp-nip" value="${nipVal}">`;
+                  if (drCell) drCell.parentElement.innerHTML = `<input class="inp-dr" value="${drVal}" placeholder="JJ/MM/AAAA">`;
+                  if (dreCell) dreCell.parentElement.innerHTML = `<input class="inp-dre" value="${dreVal}" placeholder="JJ/MM/AAAA">`;
+                  if (notesCell) notesCell.innerHTML = `<input class="inp-notes" value="${notesVal}">`;
+
+                  btn.textContent = 'Sauvegarder';
+                  btn.dataset.editing = '1';
+                } else {
+                  // save
+                  const nip = row.querySelector('.inp-nip')?.value.trim() || '';
+                  let drRaw = row.querySelector('.inp-dr')?.value;
+                  let dreRaw = row.querySelector('.inp-dre')?.value;
+                  let dr = drRaw == null ? null : drRaw.trim();
+                  let dre = dreRaw == null ? null : dreRaw.trim();
+                  if (dr === '') dr = null;
+                  if (dre === '') dre = null;
+
+                  let notesRaw = row.querySelector('.inp-notes')?.value;
+                  let notes = notesRaw == null ? null : notesRaw.trim();
+                  if (notes === '') notes = null;
+
+                  try {
+                    const res = await fetch('/api/cartes/update', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                      body: JSON.stringify({ CardId: Number(cardId), NIP: nip, DateRemise: dr, DateReprise: dre, Notes: notes })
+                    });
+                    if (!res.ok) {
+                      const txt = await res.text(); throw new Error(txt || res.statusText);
+                    }
+                    // show success message after reload
+                    try { sessionStorage.setItem('flash_cartes', 'Modifications enregistrées.'); } catch(e){}
+                    location.reload();
+                  } catch (err) {
+                    alert('Erreur sauvegarde: ' + err.message);
+                  }
+                }
+              }
+
+              // Delete
+              if (e.target.matches('.btn-delete')) {
+                const btn = e.target;
+                const cardId = btn.dataset.cardid;
+                const cardNumber = btn.dataset.cardnumber;
+                const row = btn.closest('tr');
+                openDeleteModal(cardId, cardNumber, row);
+              }
+            });
+
+          
+
+          function openDeleteModal(cardId, cardNumber, row) {
+            // Build modal
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            const box = document.createElement('div');
+            box.className = 'modal-box';
+            box.innerHTML = `
+              <h3>Confirmation suppression</h3>
+              <p>Attention: suppression définitive de la carte <strong>${cardNumber}</strong>.</p>
+              <p>Pour confirmer, entrez le numéro de carte dans la première case, et le mot <strong>SUPPRIMER</strong> (sensible à la casse) dans la seconde case.</p>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                <input id="confirm-card" placeholder="Numéro carte" value="">
+                <input id="confirm-word" placeholder="Tapez SUPPRIMER">
+              </div>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                <button id="cancel">Annuler</button>
+                <button id="confirm" disabled>Supprimer</button>
+              </div>
+            `;
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+
+            const inpCard = box.querySelector('#confirm-card');
+            const inpWord = box.querySelector('#confirm-word');
+            const btnCancel = box.querySelector('#cancel');
+            const btnConfirm = box.querySelector('#confirm');
+
+            inpCard.addEventListener('input', check);
+            inpWord.addEventListener('input', check);
+
+            function check() {
+              btnConfirm.disabled = !(inpCard.value === cardNumber && inpWord.value === 'SUPPRIMER');
+            }
+
+            btnCancel.addEventListener('click', () => { document.body.removeChild(overlay); });
+            btnConfirm.addEventListener('click', async () => {
+              try {
+                const res = await fetch('/api/cartes/delete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                  body: JSON.stringify({ CardId: Number(cardId), CardNumber: cardNumber, Confirm: 'SUPPRIMER' })
+                });
+                if (!res.ok) { const txt = await res.text(); throw new Error(txt || res.statusText); }
+                // show flash and reload to reflect deletion
+                try { sessionStorage.setItem('flash_cartes', 'Carte supprimée.'); } catch(e) {}
+                location.reload();
+              } catch (err) {
+                alert('Erreur suppression: ' + err.message);
+              }
             });
           }
+          }
+
+    
+
+
+
 
 
     // Init
@@ -257,16 +496,92 @@
         await loadAll();
         applyFilter();
         setupRowSelection();
+        // populate oil company list
+        populateOilCoList();
+        // Ajouter carte button handler
+        const addBtn = document.querySelector('.AjouterCarte');
+        if (addBtn) addBtn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          try {
+            const driverName = (document.getElementById('driverName')?.value || '').trim();
+            const cardNumber = (document.getElementById('cardNumber')?.value || '').trim();
+            const NIP = (document.getElementById('NIP')?.value || '').trim();
+            const expiration = (document.getElementById('Expiration')?.value || '').trim();
+            const dateRemise = (document.getElementById('DateRemise')?.value || '').trim();
+            const note = (document.getElementById('Note')?.value || '').trim();
+            const oilCoName = (document.getElementById('oilCoName')?.value || '').trim();
+
+            if (!driverName || !cardNumber || !NIP) {
+              alert('driverName, cardNumber et NIP sont obligatoires');
+              return;
+            }
+            if (!oilCoName) {
+              alert('Pétrolière (oilCoName) est obligatoire');
+              return;
+            }
+
+            const payload = {
+              driverName: driverName,
+              cardNumber: cardNumber,
+              NIP: NIP,
+              oilCoName: oilCoName,
+              Expiration: expiration || null,
+              DateRemise: dateRemise || null,
+              Note: note || null
+            };
+
+            const res = await fetch('/api/cartes/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+              const txt = await res.text(); throw new Error(txt || res.statusText);
+            }
+            try { sessionStorage.setItem('flash_cartes', 'Carte ajoutée.'); } catch(e){}
+            location.reload();
+          } catch (err) {
+            alert('Erreur ajout carte: ' + err.message);
+          }
+        });
         // Debounced search input
         const debouncedFilter = debounce(applyFilter, 250);
         document.getElementById('f-search').addEventListener('input', debouncedFilter);
         document.getElementById('f-actif').addEventListener('change', applyFilter);
         document.getElementById('f-broker').addEventListener('change', applyFilter);
         document.getElementById('f-dispatchGroup').addEventListener('change', applyFilter);
+        // Pré-remplir le champ DateRemise du formulaire d'ajout avec la date du jour si vide
+        try {
+          const addDr = document.getElementById('DateRemise');
+          if (addDr && !addDr.value) {
+            const _d = new Date();
+            const _yyyy = _d.getFullYear();
+            const _mm = String(_d.getMonth() + 1).padStart(2, '0');
+            const _dd = String(_d.getDate()).padStart(2, '0');
+            addDr.value = `${_yyyy}-${_mm}-${_dd}`; // input type=date expects yyyy-mm-dd
+          }
+        } catch (e) {}
+        // show flash message set by previous action (e.g., save)
+        try {
+          const msg = sessionStorage.getItem('flash_cartes');
+          if (msg) {
+            showFlash(msg);
+            sessionStorage.removeItem('flash_cartes');
+          }
+        } catch (e) {}
       } catch (e) {
         alert('Erreur chargement: ' + e.message);
       }
     })();
+
+    function showFlash(msg) {
+      const d = document.createElement('div');
+      d.className = 'flash-success';
+      d.textContent = msg;
+      document.body.appendChild(d);
+      setTimeout(() => { d.classList.add('visible'); }, 10);
+      setTimeout(() => { d.classList.remove('visible'); setTimeout(() => d.remove(), 400); }, 3500);
+    }
   </script>
 
 

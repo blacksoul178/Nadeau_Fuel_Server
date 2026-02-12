@@ -70,6 +70,9 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	//Post API
 	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
 	mux.Handle("POST /api/brokerCo/add", requireLogin(http.HandlerFunc(brokersAddCo)))
+	mux.Handle("POST /api/cartes/add", requireLogin(http.HandlerFunc(cartesAddHandler)))
+	mux.Handle("POST /api/cartes/update", requireLogin(http.HandlerFunc(cartesUpdateHandler)))
+	mux.Handle("POST /api/cartes/delete", requireLogin(http.HandlerFunc(cartesDeleteHandler)))
 	//admin
 	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsErrorHandler)))
 
