@@ -9,8 +9,9 @@ import (
 
 // SessionInfo holds the parsed session cookie data
 type SessionInfo struct {
-	Username string
-	Role     string
+	Username    string
+	Role        string
+	IsSuperUser bool
 }
 
 var sessionManager *session.Manager
@@ -41,16 +42,23 @@ func GetSessionInfo(r *http.Request) *SessionInfo {
 		return nil
 	}
 
+	isSuperUser := data.Role == "superuser"
 	return &SessionInfo{
-		Username: data.Username,
-		Role:     data.Role,
+		Username:    data.Username,
+		Role:        data.Role,
+		IsSuperUser: isSuperUser,
 	}
 }
 
 // IsAdmin checks if the user is an admin
 func IsAdmin(r *http.Request) bool {
 	session := GetSessionInfo(r)
-	return session != nil && session.Role == "admin"
+	return session != nil && (session.Role == "admin" || session.Role == "superuser")
+}
+
+func IsSuperUser(r *http.Request) bool {
+	session := GetSessionInfo(r)
+	return session != nil && session.Role == "superuser"
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,8 +119,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Info("Login successful for user: " + user.Username)
 
 		// Create secure session cookie
+
 		role := "user"
-		if user.IsAdmin {
+		if user.IsSuperUser {
+			role = "superuser"
+		} else if user.IsAdmin {
 			role = "admin"
 		}
 
@@ -196,10 +207,11 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplHome.Execute(w, data)
@@ -243,10 +255,11 @@ func chauffeursHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplChauffeurs.Execute(w, data)
@@ -269,10 +282,11 @@ func cartesHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplCartes.Execute(w, data)
@@ -295,10 +309,11 @@ func transactionsHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplTransactions.Execute(w, data)
@@ -321,10 +336,11 @@ func petrolieresHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplPetrolieres.Execute(w, data)
@@ -347,10 +363,11 @@ func vehiculesHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplVehicules.Execute(w, data)
@@ -373,10 +390,11 @@ func brokersHandler(w http.ResponseWriter, r *http.Request) {
 	csrfManager.SetTokenCookie(w, token)
 
 	data := map[string]interface{}{
-		"Username":  session.Username,
-		"Role":      session.Role,
-		"IsAdmin":   session.Role == "admin",
-		"CSRFToken": token,
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"CSRFToken":   token,
 	}
 
 	_ = tplBrokers.Execute(w, data)

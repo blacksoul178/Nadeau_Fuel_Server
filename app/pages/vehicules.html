@@ -99,6 +99,8 @@
             <th class="col-100">Fuel</th>
             <th class="col-120">GL</th>
             <th class="col-120">Nom GL</th>
+            <th class="col-100">Propriétaire</th>
+            <th class="col-80">Référence</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -143,6 +145,8 @@
               const unitDescription = r.unitDescription ?? '';
               const unitProvince = r.unitProvince ?? '';
               const gl = r.GL ?? r.gl ?? '';
+              const proprietaire = r.Propriétaire
+              const ref = r.Ref
               const unitIsIFTAPlatedBool = parseBoolLoose(r.unitIsIFTAPlated);
 
               const haystack = [
@@ -151,7 +155,9 @@
                 unitLicenceNumber,
                 unitDescription,
                 unitProvince,
-                gl
+                gl,
+                proprietaire,
+                ref
               ].join(' ').toLowerCase();
 
               return {
@@ -231,6 +237,8 @@
                 <td>${r.unitFuelType ?? ''}</td>
                 <td>${r.GL ?? ''}</td>
                 <td>${r.nomCommunGL ?? ''}</td>
+                <td>${r.Propriétaire ?? ''}</td>
+                <td>${r.Ref ?? ''}</td>
               `;
               frag.appendChild(tr);
             });

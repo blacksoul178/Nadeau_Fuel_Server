@@ -17,9 +17,10 @@ import (
 )
 
 type User struct {
-	ID       int
-	Username string
-	IsAdmin  bool
+	ID          int
+	Username    string
+	IsAdmin     bool
+	IsSuperUser bool
 }
 
 func normalizeUsername(u string) string {
@@ -32,16 +33,17 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	defer cancel()
 
 	var (
-		id      int
-		hash    string
-		isAdmin bool
+		id          int
+		hash        string
+		isAdmin     bool
+		isSuperUser bool
 	)
 
 	err := db.QueryRowContext(ctx, `
-        SELECT id, password_hash, isAdmin
-        FROM dbo.SiteUser
-        WHERE SiteUser=@u
-    `, sql.Named("u", u)).Scan(&id, &hash, &isAdmin)
+		SELECT id, password_hash, isAdmin, isSuperUser
+		FROM dbo.SiteUser
+		WHERE SiteUser=@u
+	`, sql.Named("u", u)).Scan(&id, &hash, &isAdmin, &isSuperUser)
 
 	if err == sql.ErrNoRows {
 		// Ne divulgue pas si l'utilisateur existe ou non
@@ -57,9 +59,10 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	}
 
 	return &User{
-		ID:       id,
-		Username: u,
-		IsAdmin:  isAdmin,
+		ID:          id,
+		Username:    u,
+		IsAdmin:     isAdmin,
+		IsSuperUser: isSuperUser,
 	}, nil
 }
 
@@ -75,13 +78,13 @@ func syncrunsErrorHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT top (10) run_name
+SELECT top (100) run_name
       ,started_at
       ,finished_at
       ,status
       ,error_message
   FROM Fuel.dbo.SyncRuns
-  where status != 'SUCCESS'
+  --where status != 'SUCCESS'
   order by started_at desc;
 `
 
@@ -151,9 +154,13 @@ SELECT
     operatorNo,
     FirstName,
     LastName,
-    Groupe
+    Groupe,
+	isBroker
 FROM Fuel.dbo.Chauffeurs
-where deletedDate = 'None' or deletedDate = ''
+WHERE
+    deletedDate IS NULL
+    OR LTRIM(RTRIM(deletedDate)) = ''
+    OR UPPER(LTRIM(RTRIM(deletedDate))) IN ('NULL', 'NONE')
 ORDER BY FirstName;
 `
 
@@ -170,6 +177,7 @@ ORDER BY FirstName;
 		Nom        string `json:"Nom"`
 		Groupe     string `json:"Groupe"`
 		StartDate  string `json:"startDate"`
+		IsBroker   bool   `json:"isBroker"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -180,8 +188,9 @@ ORDER BY FirstName;
 			lastName  sql.NullString
 			grp       sql.NullString
 			sd        sql.NullString // Changed from sql.NullTime to sql.NullString
+			isBroker  sql.NullBool
 		)
-		if err := rows.Scan(&opNo, &firstName, &lastName, &grp); err != nil {
+		if err := rows.Scan(&opNo, &firstName, &lastName, &grp, &isBroker); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on chauffeursAllHandler: " + err.Error())
 			return
@@ -201,6 +210,7 @@ ORDER BY FirstName;
 			Nom:        nom,
 			Groupe:     grp.String,
 			StartDate:  startDate,
+			IsBroker:   isBroker.Bool,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -243,7 +253,7 @@ SELECT Cardid
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		http.Error(w, "query error: "+err.Error(), 500)
-		logger.Info("Query error on vehiculesAllHandler: " + err.Error())
+		logger.Info("Query error on cartesAllHandler: " + err.Error())
 		return
 	}
 	defer rows.Close()
@@ -295,7 +305,7 @@ SELECT Cardid
 			&Active,
 			&Notes); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
-			logger.Info("Scan error on vehiculesAllHandler: " + err.Error())
+			logger.Info("Scan error on cartesAllHandler: " + err.Error())
 			return
 		}
 
@@ -337,7 +347,7 @@ SELECT Cardid
 	}
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
-		logger.Info("Rows error on vehiculesAllHandler: " + err.Error())
+		logger.Info("Rows error on cartesAllHandler: " + err.Error())
 		return
 	}
 
@@ -941,6 +951,8 @@ SELECT unitNumber
 	,unitFuelType
 	,GL
 	,NomCommunGl
+	,Propriétaire
+	,Ref
 FROM Fuel.dbo.unitListWithGL
 `
 
@@ -962,6 +974,8 @@ FROM Fuel.dbo.unitListWithGL
 		UnitFuelType     string `json:"unitFuelType"`
 		Gl               string `json:"GL"`
 		NomCommunGL      string `json:"nomCommunGL"`
+		Propriétaire     string `json:"Propriétaire"`
+		Ref              string `json:"Ref"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -976,8 +990,10 @@ FROM Fuel.dbo.unitListWithGL
 			UnitFuelType     sql.NullString
 			Gl               sql.NullString
 			NomCommunGL      sql.NullString
+			Propriétaire     sql.NullString
+			Ref              sql.NullString
 		)
-		if err := rows.Scan(&UnitNumber, &Plaque, &IsUsable, &UnitDescription, &UnitIsIFTAPlated, &UnitProvince, &UnitFuelType, &Gl, &NomCommunGL); err != nil {
+		if err := rows.Scan(&UnitNumber, &Plaque, &IsUsable, &UnitDescription, &UnitIsIFTAPlated, &UnitProvince, &UnitFuelType, &Gl, &NomCommunGL, &Propriétaire, &Ref); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on vehiculesAllHandler: " + err.Error())
 			return
@@ -993,6 +1009,8 @@ FROM Fuel.dbo.unitListWithGL
 			UnitFuelType:     UnitFuelType.String,
 			Gl:               Gl.String,
 			NomCommunGL:      NomCommunGL.String,
+			Propriétaire:     Propriétaire.String,
+			Ref:              Ref.String,
 		})
 	}
 	if err := rows.Err(); err != nil {

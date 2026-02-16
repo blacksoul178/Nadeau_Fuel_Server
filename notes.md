@@ -1,5 +1,5 @@
 # Build binary for windows
-GOOS=windows GOARCH=amd64 go build -o server.exe
+GOOS=windows GOARCH=amd64 go build -o ProjetFuel.exe
 
 
 Config.json will be external file to config the app

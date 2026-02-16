@@ -71,6 +71,7 @@
     </section>
   </main>
 
+{{if or .IsAdmin .IsSuperUser}}
 <main class="container">
     <!-- Ajout de compagnie broker -->
     <section class="panel">
@@ -90,6 +91,7 @@
           <button type="submit" class="AjouterBrokerCo">Ajouter</button>
     </section>
   </main>
+{{end}}
 
 <main class="container">
     <!-- Filters -->
@@ -228,7 +230,11 @@
           throw new Error(txt || ('HTTP ' + res.status));
         }
 
-        alert('Chauffeur broker ajouté avec succès ✅');
+        // Parse JSON response to read server-calculated fields (e.g. lastName)
+        const result = await res.json();
+        const driverLastName = result.lastName || result.last_name || '';
+
+        alert(`Chauffeur broker ${brokerName}${driverLastName ? ' ' + driverLastName : ''} ajouté avec succès ✅`);
         // Reset form
         sel.value = '';
         document.getElementById('dispatchGroup').value = '1';
@@ -299,7 +305,10 @@
         applyFilter();
         document.getElementById('f-search').addEventListener('input', applyFilter);
         document.querySelector('.AjouterChauffeur').addEventListener('click', addBrokerDriver);
-        document.querySelector('.AjouterBrokerCo').addEventListener('click', addBrokerCo);
+        const addBrokerCoBtn = document.querySelector('.AjouterBrokerCo');
+        if (addBrokerCoBtn) {
+          addBrokerCoBtn.addEventListener('click', addBrokerCo);
+        }
       } catch (e) {
         alert('Erreur chargement: ' + e.message);
       }

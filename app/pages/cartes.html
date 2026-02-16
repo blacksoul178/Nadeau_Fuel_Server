@@ -160,6 +160,8 @@
 
 
 <script>
+  // Expose delete permission to JS (for dynamic UI)
+  const CAN_DELETE = {{if or .IsAdmin .IsSuperUser}}true{{else}}false{{end}}; // THIS shows an error in vscode but it is linter related and works fine
     
     const state = { data: [],
       filtered: [],
@@ -223,8 +225,16 @@
       const res = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       
+
       state.data = await res.json();
-      populateDriverNameSelect(state.data);
+      // Fetch driver names from /api/chauffeurs/all for the datalist
+      try {
+        const driversRes = await fetch('/api/chauffeurs/all', { headers: { 'Accept': 'application/json' } });
+        if (driversRes.ok) {
+          const drivers = await driversRes.json();
+          populateDriverNameSelect(drivers);
+        }
+      } catch (e) { /* ignore */ }
 
             // Pré-calcul du haystack de recherche et normalisation des champs
             state.data = state.data.map(r => {
@@ -309,6 +319,10 @@
 
             rows.forEach(r => {
               const tr = document.createElement('tr');
+              let controls = `<button class="btn-edit" data-cardid="${r.CardId}">Modifier</button>`;
+              if (CAN_DELETE) {
+                controls += ` <button class="btn-delete" data-cardid="${r.CardId}" data-cardnumber="${r.CardNumber}">Supprimer</button>`;
+              }
               tr.innerHTML = `
                 <td>${r.Nom ?? ''}</td>
                 <td>${r.Nom_DispatchGroup ?? ''}</td>
@@ -320,10 +334,7 @@
                 <td class="cell-dre" data-field="DateReprise" data-cardid="${r.CardId}"><span class="val">${r.DateReprise ?? ''}</span></td>
                 <td data-field="Active">${r.Active ?? ''}</td>
                 <td data-field="Notes">${r.Notes ?? ''}</td>
-                <td>
-                  <button class="btn-edit" data-cardid="${r.CardId}">Modifier</button>
-                  <button class="btn-delete" data-cardid="${r.CardId}" data-cardnumber="${r.CardNumber}">Supprimer</button>
-                </td>
+                <td>${controls}</td>
               `;
               frag.appendChild(tr);
             });
