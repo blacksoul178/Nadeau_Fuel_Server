@@ -32,6 +32,7 @@ type LoggerCfg struct {
 
 type ServerCfg struct {
 	Port string `json:"port"` //server runs on port
+	Dev  bool   `json:"dev_env"`
 }
 
 type DbCfg struct {

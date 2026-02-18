@@ -50,6 +50,10 @@ func main() {
 
 	logger.Info(fmt.Sprintf("Server starting on port: %s...", appConfig.Server.Port))
 	log.Printf("Serving on port: %s\n", appConfig.Server.Port)
-	log.Fatal(srv.ListenAndServeTLS("./certs/server.crt", "./certs/server.key"))
+	if appConfig.Server.Dev == true {
+		log.Fatal(srv.ListenAndServeTLS("./certs/dev/dev.crt", "./certs/dev/dev.key"))
+	} else {
+		log.Fatal(srv.ListenAndServeTLS("./certs/prod/prod.crt", "./certs/prod/prod.key"))
+	}
 
 }
