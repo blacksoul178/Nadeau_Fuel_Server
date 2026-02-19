@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -135,6 +136,53 @@ SELECT top (100) run_name
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
+}
+func logsApiHandler(w http.ResponseWriter, r *http.Request) {
+
+	var logFilePath = `server.log`
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	// how many lines to return (default 500, max 10000)
+	n := 500
+	if s := r.URL.Query().Get("last"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 && v <= 10000 {
+			n = v
+		}
+	}
+
+	data, err := os.ReadFile(logFilePath)
+	if err != nil {
+		// keep it JSON so your fetch().json() doesn't fail
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"error":   true,
+			"message": "failed to read log file",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Split into lines (handle Windows \r\n and final trailing line)
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	lines := strings.Split(text, "\n")
+
+	// Drop a trailing empty line if present
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	// Take last n lines
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+
+	// Reverse so newest appears first
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+
+	_ = json.NewEncoder(w).Encode(lines)
 }
 
 // /api/chauffeurs
@@ -381,12 +429,12 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Info("ReadAll error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 	if err := json.Unmarshal(b, &body); err != nil {
 		logger.Info("JSON unmarshal error on cartesAddHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
@@ -406,7 +454,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if !csrfManager.ValidateToken(csrf) {
 		logger.Info("Invalid CSRF token provided to cartesAddHandler")
-		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
 		return
 	}
 
@@ -435,7 +483,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		logger.Info("BeginTx error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
 		return
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -448,7 +496,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logger.Info("QueryRow error on cartesAddHandler (resolve driver): " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
 		return
 	}
 
@@ -464,7 +512,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				logger.Info("QueryRow error on cartesAddHandler (resolve oilco): " + err.Error())
-				respondWithError(w, http.StatusInternalServerError, "database error")
+				respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
 				return
 			}
 			if oilCoId.Valid {
@@ -534,13 +582,13 @@ VALUES (@driverId, @cardNumber, @nip, @oilCoId, TRY_CONVERT(date, @expiration, 1
 		sql.Named("notes", noteParam),
 	).Scan(&newId); err != nil {
 		logger.Info("Insert error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
 		logger.Info("Commit error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
 		return
 	}
 
@@ -568,7 +616,7 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Info("ReadAll error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
@@ -583,7 +631,7 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqBody
 	if err := json.Unmarshal(b, &body); err != nil {
 		logger.Info("JSON unmarshal error on cartesUpdateHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
@@ -609,7 +657,7 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !validated {
-		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
 		logger.Info("Invalid CSRF token provided to cartesUpdateHandler; tried candidates")
 		return
 	}
@@ -633,7 +681,7 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		logger.Info("BeginTx error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -692,13 +740,13 @@ WHERE CardId = @cid;
 		sql.Named("cid", body.CardId),
 	); err != nil {
 		logger.Info("Exec error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
 		logger.Info("Commit error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -733,7 +781,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Info("ReadAll error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
@@ -746,7 +794,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqBody
 	if err := json.Unmarshal(b, &body); err != nil {
 		logger.Info("JSON unmarshal error on cartesDeleteHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
@@ -766,7 +814,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if !csrfManager.ValidateToken(csrf) {
 		logger.Info("Invalid CSRF token provided to cartesDeleteHandler")
-		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
 		return
 	}
 
@@ -784,7 +832,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		logger.Info("BeginTx error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -827,7 +875,7 @@ WHERE CardId = @cid
 			return
 		}
 		logger.Info("QueryRow error on cartesDeleteHandler (select): " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -855,7 +903,7 @@ WHERE CardId = @cid
 	delQ := `DELETE FROM Fuel.dbo.Cartes WHERE CardId = @cid AND CardNumber = @cn;`
 	if res, err := tx.ExecContext(ctx, delQ, sql.Named("cid", body.CardId), sql.Named("cn", body.CardNumber)); err != nil {
 		logger.Info("Exec error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	} else {
 		if ra, _ := res.RowsAffected(); ra == 0 {
@@ -866,7 +914,7 @@ WHERE CardId = @cid
 
 	if err := tx.Commit(); err != nil {
 		logger.Info("Commit error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -1105,13 +1153,13 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Info("ReadAll error on brokersAddDriver: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 	logger.Info("brokersAddDriver raw body: " + string(b))
 	if err := json.Unmarshal(b, &body); err != nil {
 		logger.Info("JSON unmarshal error on brokersAddDriver: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 	logger.Info(fmt.Sprintf("brokersAddDriver parsed body: brokerId=%d brokerName=%q dispatchGroup=%d startDate=%q", body.BrokerId, body.BrokerName, body.DispatchGroup, body.StartDate))
@@ -1132,7 +1180,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	}
 	if !csrfManager.ValidateToken(csrf) {
 		logger.Info("Invalid CSRF token provided to brokersAddDriver")
-		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
 		return
 	}
 
@@ -1156,7 +1204,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		logger.Info("BeginTx error on brokersAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 	defer func() {
@@ -1171,7 +1219,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logger.Info("Query error on brokersAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -1182,7 +1230,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 		SELECT ISNULL(MAX(TRY_CAST(LastName AS INT)), 0) FROM Fuel.dbo.Drivers WHERE FirstName = @fname
 	`, sql.Named("fname", body.BrokerName)).Scan(&maxSuffix); err != nil {
 		logger.Info("Query error on brokersAddDriver (max suffix): " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -1211,7 +1259,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 		sql.Named("FK_BrokerId", body.BrokerId),
 	).Scan(&newId); err != nil {
 		logger.Info("Insert error on brokersAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -1224,7 +1272,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 			logger.Info("Verification select: no rows found after insert for operatorNo=" + operatorNo)
 		} else {
 			logger.Info("Verification select error on brokersAddDriver: " + err.Error())
-			respondWithError(w, http.StatusInternalServerError, "database error")
+			respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 			return
 		}
 	} else {
@@ -1233,7 +1281,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit(); err != nil {
 		logger.Info("Commit error on brokersAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -1271,13 +1319,13 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Info("ReadAll error on brokersAddCo: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 	logger.Info("brokersAddCo raw body: " + string(b))
 	if err := json.Unmarshal(b, &body); err != nil {
 		logger.Info("JSON unmarshal error on brokersAddCo: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 	logger.Info(fmt.Sprintf("brokersAddCo parsed body: brokerCoCommonName=%s brokerCoLegalName=%s brokerCoAcomba=%s", body.BrokerCoCommonName, body.BrokerCoLegalName, body.BrokerCoAcomba))
@@ -1298,7 +1346,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 	}
 	if !csrfManager.ValidateToken(csrf) {
 		logger.Info("Invalid CSRF token provided to brokersAddCo")
-		respondWithError(w, http.StatusForbidden, "invalid CSRF token")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
 		return
 	}
 
@@ -1322,7 +1370,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		logger.Info("BeginTx error on brokersAddCo: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 	defer func() {
@@ -1343,7 +1391,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 		sql.Named("Acomba", body.BrokerCoAcomba),
 	).Scan(&newId); err != nil {
 		logger.Info("Insert error on brokersAddCo: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 
@@ -1356,7 +1404,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 			logger.Info("Verification select: no rows found after insert for Nom_Commun" + body.BrokerCoCommonName)
 		} else {
 			logger.Info("Verification select error on brokersAddCo: " + err.Error())
-			respondWithError(w, http.StatusInternalServerError, "database error")
+			respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 			return
 		}
 	} else {
@@ -1365,7 +1413,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit(); err != nil {
 		logger.Info("Commit error on brokersAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error")
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
 		return
 	}
 

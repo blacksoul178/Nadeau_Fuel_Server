@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB Fuel - Syncruns</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+
+<body>
+    <header>
+        <div>
+            <h1>DB Fuel - Nadeau</h1>
+        </div>
+        <div class="user-info">
+            {{.Username}}
+            <span class="role-badge {{.Role}}">{{.Role}}</span>
+        <form action="/logout" method="POST">
+        <!-- CSRF Token for logout -->
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+        <button type="submit" class="logout-btn">Logout</button>
+        </div>
+    </form>
+  </header>
+  <br>
+  
+  <section id="content">
+        <h2>Bienvenue {{.Username}}</h2> 
+        {{if .IsAdmin}}
+        <div class="admin-section">
+            <h3>Admin Panel</h3>
+            <p>You have admin access. You can manage:</p>
+            <nav>
+              <a href="/admin">Admin Dashboard</a>
+                <a href="/admin/users">Manage Users</a>
+                <a href="/admin/syncruns">View last syncruns</a>
+                <a href="/admin/logs" class="tab active">View logs</a>
+              </nav>
+        </div>
+        {{end}}
+        <h4>Navigation</h4>
+        
+        <nav class="tabs">
+          <a href="/chauffeurs"    class="tab">Chauffeurs</a>
+    <a href="/cartes"        class="tab">Cartes</a>
+    <a href="/transactions"  class="tab">Transactions</a>
+    <a href="/petrolieres"   class="tab">Pétrolières</a>
+    <a href="/vehicules"     class="tab">Véhicules</a>
+    <a href="/brokers"       class="tab">Compagnies Broker</a>
+  </nav>
+</section>
+
+
+
+<main class="container">
+  <section class="panel">
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <label>Show last 
+        <input id="logLast" type="number" min="10" max="10000" value="500" style="width:90px">
+        lines
+      </label>
+      <button id="btnRefresh" type="button">Refresh</button>
+      <label style="margin-left:8px;">
+        Filter:
+        <input id="logFilter" type="text" placeholder="ex. ERROR or logsApiHandler" style="width:240px">
+      </label>
+      <label style="margin-left:8px;">
+        Auto-refresh
+        <input id="autoRefresh" type="checkbox" />
+      </label>
+    </div>
+  </section><section>
+
+    <pre id="logView" style="
+      margin-top:10px; 
+      background:#0b0c10;
+      color:#c5c6c7;
+      border:1px solid #1f2833;
+      border-radius:6px;
+      padding:10px;
+      max-height:70vh;
+      overflow:auto;
+      white-space:pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    ">(loading...)</pre>
+  </section>
+</main>
+
+
+<script>
+  
+ const state = { data: [], timer: null };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  async function loadAll() {
+    const lastInput = document.getElementById('logLast');
+    const last = Math.min(Math.max(parseInt(lastInput.value || '500', 10) || 500, 10), 10000);
+
+    const res = await fetch('/api/admin/logs?last=' + encodeURIComponent(last), {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) {
+      // Try to read JSON error
+      let msg = 'HTTP ' + res.status;
+      try {
+        const d = await res.json();
+        msg = d.message || msg;
+        if (d.details) msg += ' - ' + d.details;
+      } catch { /* ignore */ }
+      throw new Error(msg);
+    }
+    state.data = await res.json(); // array of strings
+  }
+
+  function render() {
+    const pre = document.getElementById('logView');
+    const filter = (document.getElementById('logFilter').value || '').toLowerCase().trim();
+
+    let lines = state.data;
+    if (filter) {
+      lines = lines.filter(l => l.toLowerCase().includes(filter));
+    }
+    pre.innerHTML = esc(lines.join('\n')) || '(no lines)';
+  }
+
+  async function refresh() {
+    try {
+      await loadAll();
+      render();
+    } catch (e) {
+      alert('Erreur chargement: ' + e.message);
+    }
+  }
+
+  (function init() {
+    document.getElementById('btnRefresh').addEventListener('click', refresh);
+    document.getElementById('logFilter').addEventListener('input', render);
+
+    // Auto-refresh checkbox
+    document.getElementById('autoRefresh').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (state.timer) clearInterval(state.timer);
+        state.timer = setInterval(refresh, 5000); // every 5s
+        refresh(); // immediate
+      } else {
+        if (state.timer) clearInterval(state.timer);
+        state.timer = null;
+      }
+    });
+
+    // initial load
+    refresh();
+  })();
+
+
+    </script>
+</body>
+
+
+
+
+</html>

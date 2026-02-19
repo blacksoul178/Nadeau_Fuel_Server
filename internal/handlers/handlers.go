@@ -429,3 +429,33 @@ func syncrunsHandler(w http.ResponseWriter, r *http.Request) {
 
 	_ = tplSyncruns.Execute(w, data)
 }
+func logsHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if session.Role != "admin" {
+		http.Redirect(w, r, "/home", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":  session.Username,
+		"Role":      session.Role,
+		"IsAdmin":   session.Role == "admin",
+		"CSRFToken": token,
+	}
+
+	_ = tplLogs.Execute(w, data)
+}

@@ -21,6 +21,7 @@ var tplPetrolieres = template.Must(template.ParseFiles(filepath.Join(filepathRoo
 var tplVehicules = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "vehicules.html")))
 var tplBrokers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "brokers.html")))
 var tplSyncruns = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "syncruns.html")))
+var tplLogs = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "logs.html")))
 
 var db *sql.DB
 
@@ -44,20 +45,9 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/vehicules", requireLogin(vehiculesHandler))
 	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
 	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
+	mux.HandleFunc("/admin/logs", requireLogin(logsHandler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { //root
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
-	})
-
-	//for development only
-	mux.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-		w.Header().Del("ETag")
-		w.Header().Del("Last-Modified")
-
-		var homePath = filepath.Join(filepathRoot, "pages", "cartes.html") // For Dev Only
-		http.ServeFile(w, r, homePath)
 	})
 
 	//Get API
@@ -75,12 +65,11 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("POST /api/cartes/delete", requireLogin(http.HandlerFunc(cartesDeleteHandler)))
 	//admin
 	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsErrorHandler)))
+	mux.Handle("GET /api/admin/logs", requireLogin(http.HandlerFunc(logsApiHandler)))
 
 }
 
 //helpers
-
-// for development only
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
 	type errorResponse struct {
