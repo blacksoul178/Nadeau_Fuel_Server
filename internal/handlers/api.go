@@ -1145,6 +1145,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 		BrokerName    string `json:"brokerName"`
 		DispatchGroup int    `json:"dispatchGroup"`
 		StartDate     string `json:"startDate"`
+		DeletedDate   string `json:"deletedDate"`
 		CSRF          string `json:"csrf,omitempty"`
 	}
 	var body reqBody
@@ -1162,7 +1163,12 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
-	logger.Info(fmt.Sprintf("brokersAddDriver parsed body: brokerId=%d brokerName=%q dispatchGroup=%d startDate=%q", body.BrokerId, body.BrokerName, body.DispatchGroup, body.StartDate))
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+	logger.Info(fmt.Sprintf("Utilisateur %s ajoute le chauffeur Broker: brokerId=%d brokerName=%q dispatchGroup=%d startDate=%q deletedDate=%s", user, body.BrokerId, body.BrokerName, body.DispatchGroup, body.StartDate, body.DeletedDate))
 
 	// Determine CSRF token: header -> body -> cookie
 	csrf := r.Header.Get("X-CSRF-Token")
@@ -1244,9 +1250,9 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	// Insert driver and return new ID using OUTPUT
 	insertQ := `
 	SET NOCOUNT ON;
-	INSERT INTO Fuel.dbo.Drivers (operatorNo, FirstName, LastName, FK_DispatchGroup, startDate, isBroker, FK_BrokerId)
+	INSERT INTO Fuel.dbo.Drivers (operatorNo, FirstName, LastName, FK_DispatchGroup, startDate, deletedDate, isBroker, FK_BrokerId)
 	OUTPUT INSERTED.id
-	VALUES (@operatorNo, @FirstName, @LastName, @FK_DispatchGroup, @startDate, @isBroker, @FK_BrokerId);
+	VALUES (@operatorNo, @FirstName, @LastName, @FK_DispatchGroup, @startDate, @deletedDate, @isBroker, @FK_BrokerId);
 	`
 	var newId sql.NullInt64
 	if err := tx.QueryRowContext(ctx, insertQ,
@@ -1255,6 +1261,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 		sql.Named("LastName", lastName),
 		sql.Named("FK_DispatchGroup", body.DispatchGroup),
 		sql.Named("startDate", body.StartDate),
+		sql.Named("deletedDate", body.DeletedDate),
 		sql.Named("isBroker", 1),
 		sql.Named("FK_BrokerId", body.BrokerId),
 	).Scan(&newId); err != nil {
