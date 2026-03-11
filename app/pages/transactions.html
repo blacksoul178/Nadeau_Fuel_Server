@@ -50,13 +50,128 @@
 </section>
 
 
-<section>
-    <h1>Woah Minute là!, Une chose à la fois!</h1>
-</section>
+<main class="container">
+  <!-- Filters -->
+  <section class="panel">
+    <div>
+      <label for="f-name">Importation de transactions</label>
+      </div>
+      <button type="importTransactions" class="importTrans-btn">Importer les transactions</button>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th>Nom du fichier</th>
+            <th>Date de début</th>
+            <th>Date de fin</th>
+            <th>Status</th>
+            <th>Error</th>
+            <th>Lignes Total</th>
+            <th>Importées</th>
+            <th>Échecs</th>
+            <th>Transactions Ignorées</th>
+            <th>Cartes non-existantes</th>
+            <th>Autres erreurs</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
 
 
 
 
+<script>
 
+    const state = { data: [] };
+
+    // Fetch ALL once (small table)
+    async function loadAll() {
+      const res = await fetch('/api/transactions/all', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      state.data = await res.json();
+    }
+
+
+    // Render table
+    function render(rows) {
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="col-120">${r.RunName ?? ''}</td>
+          <td>${r.StartedAt ?? ''}</td>
+          <td>${r.FinishedAt ?? ''}</td>
+          <td>${r.Status ?? ''}</td>
+          <td class="wrap">${r.ErrorMessage ?? ''}</td>
+          <td>${r.TotalLines ?? ''}</td>
+          <td>${r.Imported ?? ''}</td>
+          <td>${r.Failures ?? ''}</td>
+          <td class="wrap">${r.Duplicates ?? ''}</td>
+          <td class="wrap">${r.Missing ?? ''}</td>
+          <td class="wrap">${r.OtherFailures ?? ''}</td>
+          `;
+          // Add click listener to toggle selection
+        tr.addEventListener('click', function() {
+          this.classList.toggle('selected');
+        });
+        tb.appendChild(tr);
+      });
+    }
+
+
+    function getCookie(name) {
+      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return v ? v.pop() : '';
+    }
+
+    async function importTrans() {
+
+      try {
+        const csrf = getCookie('csrf_token');
+        const res = await fetch('/api/transactions/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          }
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        alert('Importation des transactions enclanché, attendre une minute et rafraichir la page ✅');
+      }
+     catch (e) {
+        alert('Erreur du démarrage de l\'importation: ' + (e));
+      }
+    }
+
+    // Init
+    (async function init() {
+      try {
+        await loadAll();
+        let rows = state.data
+        render(rows)
+        const ImportTransBtn = document.querySelector('.importTrans-btn');
+        if (ImportTransBtn) {
+          ImportTransBtn.addEventListener('click', importTrans);
+        }
+      } catch (e) {
+        alert('Erreur dchargement: ' + e.message);
+      }
+    })();
+
+</script>
 </body>
 </html>

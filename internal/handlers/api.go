@@ -67,8 +67,8 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	}, nil
 }
 
-// admin
-func syncrunsErrorHandler(w http.ResponseWriter, r *http.Request) {
+// admin fetch Data
+func syncrunsAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -79,19 +79,18 @@ func syncrunsErrorHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT top (100) run_name
+SELECT run_name
       ,started_at
       ,finished_at
       ,status
       ,error_message
   FROM Fuel.dbo.SyncRuns
-  --where status != 'SUCCESS'
   order by started_at desc;
 `
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
-		logger.Info("Query error on syncrunsErrorHandler: " + err.Error())
+		logger.Info("Query error on syncrunsAllHandler: " + err.Error())
 		http.Error(w, "query error: "+err.Error(), 500)
 		return
 	}
@@ -129,7 +128,7 @@ SELECT top (100) run_name
 		})
 	}
 	if err := rows.Err(); err != nil {
-		logger.Info("Rows error on syncrunsErrorHandler: " + err.Error())
+		logger.Info("Rows error on syncrunsAllHandler: " + err.Error())
 		http.Error(w, "rows error: "+err.Error(), 500)
 		return
 	}
@@ -185,8 +184,7 @@ func logsApiHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(lines)
 }
 
-// /api/chauffeurs
-// GET /api/chauffeurs/all
+// GETs fetch data
 func chauffeursAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -402,526 +400,6 @@ SELECT Cardid
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
-
-// POST /api/cartes/add
-func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	// Request body
-	type reqBody struct {
-		DriverName string  `json:"driverName"`
-		CardNumber string  `json:"cardNumber"`
-		NIP        string  `json:"NIP"`
-		OilCoName  *string `json:"oilCoName"`
-		Expiration *string `json:"Expiration"`
-		DateRemise *string `json:"DateRemise"`
-		Note       *string `json:"Note"`
-		CSRF       string  `json:"csrf,omitempty"`
-	}
-	var body reqBody
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Info("ReadAll error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-	if err := json.Unmarshal(b, &body); err != nil {
-		logger.Info("JSON unmarshal error on cartesAddHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	// CSRF: header -> body -> cookie
-	csrf := r.Header.Get("X-CSRF-Token")
-	if csrf == "" && body.CSRF != "" {
-		csrf = body.CSRF
-	}
-	if csrf == "" {
-		if c, err := r.Cookie("csrf_token"); err == nil {
-			csrf = c.Value
-		}
-	}
-	if csrf == "" {
-		respondWithError(w, http.StatusForbidden, "missing CSRF token")
-		return
-	}
-	if !csrfManager.ValidateToken(csrf) {
-		logger.Info("Invalid CSRF token provided to cartesAddHandler")
-		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
-		return
-	}
-
-	// Generate fresh token
-	if newToken, err := csrfManager.GenerateToken(); err == nil {
-		csrfManager.SetTokenCookie(w, newToken)
-	}
-
-	// Validate required fields
-	if strings.TrimSpace(body.DriverName) == "" || strings.TrimSpace(body.CardNumber) == "" || strings.TrimSpace(body.NIP) == "" {
-		respondWithError(w, http.StatusBadRequest, "driverName, cardNumber and NIP are required")
-		return
-	}
-	// oilCoName is required because FK_OilCoid is NOT NULL in the DB
-	if body.OilCoName == nil || strings.TrimSpace(*body.OilCoName) == "" {
-		respondWithError(w, http.StatusBadRequest, "oilCoName is required")
-		return
-	}
-
-	session := GetSessionInfo(r)
-	user := "unknown"
-	if session != nil {
-		user = session.Username
-	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		logger.Info("BeginTx error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Resolve driverName -> Drivers.id using FirstName + ' ' + LastName
-	var driverId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM Fuel.dbo.Drivers WHERE LTRIM(RTRIM(FirstName + ' ' + LastName)) = @name`, sql.Named("name", strings.TrimSpace(body.DriverName))).Scan(&driverId); err != nil {
-		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusBadRequest, "driver not found")
-			return
-		}
-		logger.Info("QueryRow error on cartesAddHandler (resolve driver): " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
-		return
-	}
-
-	// Resolve oil co if provided
-	var oilCoIdParam interface{}
-	if body.OilCoName != nil {
-		oc := strings.TrimSpace(*body.OilCoName)
-		if oc != "" {
-			var oilCoId sql.NullInt64
-			if err := tx.QueryRowContext(ctx, `SELECT id FROM Fuel.dbo.OilCo WHERE OilCoName = @name`, sql.Named("name", oc)).Scan(&oilCoId); err != nil {
-				if err == sql.ErrNoRows {
-					respondWithError(w, http.StatusBadRequest, "oil company not found")
-					return
-				}
-				logger.Info("QueryRow error on cartesAddHandler (resolve oilco): " + err.Error())
-				respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
-				return
-			}
-			if oilCoId.Valid {
-				oilCoIdParam = oilCoId.Int64
-			} else {
-				oilCoIdParam = nil
-			}
-		} else {
-			oilCoIdParam = nil
-		}
-	} else {
-		oilCoIdParam = nil
-	}
-
-	// Prepare nullable params
-	var expirationParam interface{}
-	if body.Expiration != nil {
-		s := strings.TrimSpace(*body.Expiration)
-		if s != "" {
-			expirationParam = s
-		} else {
-			expirationParam = nil
-		}
-	} else {
-		expirationParam = nil
-	}
-	var remiseParam interface{}
-	if body.DateRemise != nil {
-		s := strings.TrimSpace(*body.DateRemise)
-		if s != "" {
-			remiseParam = s
-		} else {
-			remiseParam = nil
-		}
-	} else {
-		remiseParam = nil
-	}
-	var noteParam interface{}
-	if body.Note != nil {
-		s := strings.TrimSpace(*body.Note)
-		if s != "" {
-			noteParam = s
-		} else {
-			noteParam = nil
-		}
-	} else {
-		noteParam = nil
-	}
-
-	// DateReprise should be NULL on add
-
-	insertQ := `
-SET NOCOUNT ON;
-INSERT INTO Fuel.dbo.Cartes (FK_DriverId, CardNumber, NIP, FK_OilCoId, Expiration, DateRemise, DateReprise, Notes)
-OUTPUT INSERTED.CardId
-VALUES (@driverId, @cardNumber, @nip, @oilCoId, TRY_CONVERT(date, @expiration, 120), TRY_CONVERT(date, @dr, 120), NULL, @notes);
-`
-
-	var newId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, insertQ,
-		sql.Named("driverId", sql.NullInt64{Int64: driverId.Int64, Valid: driverId.Valid}),
-		sql.Named("cardNumber", strings.TrimSpace(body.CardNumber)),
-		sql.Named("nip", strings.TrimSpace(body.NIP)),
-		sql.Named("oilCoId", oilCoIdParam),
-		sql.Named("expiration", expirationParam),
-		sql.Named("dr", remiseParam),
-		sql.Named("notes", noteParam),
-	).Scan(&newId); err != nil {
-		logger.Info("Insert error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		logger.Info("Commit error on cartesAddHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
-		return
-	}
-
-	idVal := 0
-	if newId.Valid {
-		idVal = int(newId.Int64)
-	}
-
-	logger.Info(fmt.Sprintf("User %s added Card CardId=%d CardNumber=%s OperatorNo=%d", user, idVal, body.CardNumber, driverId.Int64))
-
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "CardId": idVal})
-}
-
-// POST /api/cartes/update
-func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	// Read body
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Info("ReadAll error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	type reqBody struct {
-		CardId      int     `json:"CardId"`
-		NIP         string  `json:"NIP"`
-		DateRemise  *string `json:"DateRemise"`
-		DateReprise *string `json:"DateReprise"`
-		Notes       *string `json:"Notes"`
-		CSRF        string  `json:"csrf,omitempty"`
-	}
-	var body reqBody
-	if err := json.Unmarshal(b, &body); err != nil {
-		logger.Info("JSON unmarshal error on cartesUpdateHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	// CSRF token: try candidates in order (header, body, cookie). Accept first valid.
-	var csrfCandidates []string
-	if h := r.Header.Get("X-CSRF-Token"); h != "" {
-		csrfCandidates = append(csrfCandidates, h)
-	}
-	if body.CSRF != "" {
-		csrfCandidates = append(csrfCandidates, body.CSRF)
-	}
-	if c, err := r.Cookie("csrf_token"); err == nil {
-		if c != nil && c.Value != "" {
-			csrfCandidates = append(csrfCandidates, c.Value)
-		}
-	}
-
-	var validated bool
-	for _, candidate := range csrfCandidates {
-		if csrfManager.ValidateToken(candidate) {
-			validated = true
-			break
-		}
-	}
-	if !validated {
-		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
-		logger.Info("Invalid CSRF token provided to cartesUpdateHandler; tried candidates")
-		return
-	}
-
-	// Generate fresh token for client
-	if newToken, err := csrfManager.GenerateToken(); err == nil {
-		csrfManager.SetTokenCookie(w, newToken)
-	}
-
-	if body.CardId <= 0 {
-		respondWithError(w, http.StatusBadRequest, "invalid CardId")
-		return
-	}
-
-	session := GetSessionInfo(r)
-	user := "unknown"
-	if session != nil {
-		user = session.Username
-	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		logger.Info("BeginTx error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update assumed table Fuel.dbo.Cards (adjust if necessary)
-	updateQ := `
-UPDATE Fuel.dbo.Cartes
-SET NIP = @nip,
-	DateRemise = TRY_CONVERT(date, @dr, 103),
-	DateReprise = TRY_CONVERT(date, @dre, 103),
-	Notes = @notes
-WHERE CardId = @cid;
-`
-	// Prepare nullable params for dates: send NULL when value is nil or empty
-	var drParam interface{}
-	var dreParam interface{}
-	if body.DateRemise != nil {
-		s := strings.TrimSpace(*body.DateRemise)
-		if s != "" {
-			drParam = s
-		} else {
-			drParam = nil
-		}
-	} else {
-		drParam = nil
-	}
-	if body.DateReprise != nil {
-		s := strings.TrimSpace(*body.DateReprise)
-		if s != "" {
-			dreParam = s
-		} else {
-			dreParam = nil
-		}
-	} else {
-		dreParam = nil
-	}
-
-	// Prepare nullable param for Notes
-	var notesParam interface{}
-	if body.Notes != nil {
-		ns := strings.TrimSpace(*body.Notes)
-		if ns != "" {
-			notesParam = ns
-		} else {
-			notesParam = nil
-		}
-	} else {
-		notesParam = nil
-	}
-
-	if _, err := tx.ExecContext(ctx, updateQ,
-		sql.Named("nip", strings.TrimSpace(body.NIP)),
-		sql.Named("dr", drParam),
-		sql.Named("dre", dreParam),
-		sql.Named("notes", notesParam),
-		sql.Named("cid", body.CardId),
-	); err != nil {
-		logger.Info("Exec error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		logger.Info("Commit error on cartesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	// Build log values for dates (empty if nil)
-	drLog := ""
-	dreLog := ""
-	notesLog := ""
-	if body.DateRemise != nil {
-		drLog = *body.DateRemise
-	}
-	if body.DateReprise != nil {
-		dreLog = *body.DateReprise
-	}
-	if body.Notes != nil {
-		notesLog = *body.Notes
-	}
-	logger.Info(fmt.Sprintf("User %s updated CardId=%d NIP=%s DateRemise=%s DateReprise=%s Notes=%s", user, body.CardId, body.NIP, drLog, dreLog, notesLog))
-
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
-}
-
-// POST /api/cartes/delete
-func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Info("ReadAll error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	type reqBody struct {
-		CardId     int    `json:"CardId"`
-		CardNumber string `json:"CardNumber"`
-		Confirm    string `json:"Confirm"` // must equal "SUPPRIMER"
-		CSRF       string `json:"csrf,omitempty"`
-	}
-	var body reqBody
-	if err := json.Unmarshal(b, &body); err != nil {
-		logger.Info("JSON unmarshal error on cartesDeleteHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	// CSRF
-	csrf := r.Header.Get("X-CSRF-Token")
-	if csrf == "" && body.CSRF != "" {
-		csrf = body.CSRF
-	}
-	if csrf == "" {
-		if c, err := r.Cookie("csrf_token"); err == nil {
-			csrf = c.Value
-		}
-	}
-	if csrf == "" {
-		respondWithError(w, http.StatusForbidden, "missing CSRF token")
-		return
-	}
-	if !csrfManager.ValidateToken(csrf) {
-		logger.Info("Invalid CSRF token provided to cartesDeleteHandler")
-		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
-		return
-	}
-
-	if body.CardId <= 0 || strings.TrimSpace(body.CardNumber) == "" || body.Confirm != "SUPPRIMER" {
-		respondWithError(w, http.StatusBadRequest, "confirmation failed")
-		return
-	}
-
-	session := GetSessionInfo(r)
-	user := "unknown"
-	if session != nil {
-		user = session.Username
-	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		logger.Info("BeginTx error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Read the current row from the view so we can log its full data for restores
-	var (
-		selCardId      sql.NullInt64
-		selFirstName   sql.NullString
-		selLastName    sql.NullString
-		selCardNumber  sql.NullString
-		selNIP         sql.NullString
-		selExpiration  sql.NullString
-		selOilCoName   sql.NullString
-		selDateRemise  sql.NullString
-		selDateReprise sql.NullString
-		selActive      sql.NullBool
-		selNotes       sql.NullString
-	)
-
-	selQ := `
-SELECT CardId, FirstName, LastName, CardNumber, NIP, Expiration, OilCoName, DateRemise, DateReprise, Active, notes
-FROM Fuel.dbo.listCartes
-WHERE CardId = @cid
-`
-	if err := tx.QueryRowContext(ctx, selQ, sql.Named("cid", body.CardId)).Scan(
-		&selCardId,
-		&selFirstName,
-		&selLastName,
-		&selCardNumber,
-		&selNIP,
-		&selExpiration,
-		&selOilCoName,
-		&selDateRemise,
-		&selDateReprise,
-		&selActive,
-		&selNotes,
-	); err != nil {
-		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusBadRequest, "card not found")
-			return
-		}
-		logger.Info("QueryRow error on cartesDeleteHandler (select): " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	// Build a JSON payload of the row for logging (for potential restore)
-	backup := map[string]interface{}{
-		"CardId":      int(selCardId.Int64),
-		"FirstName":   selFirstName.String,
-		"LastName":    selLastName.String,
-		"CardNumber":  selCardNumber.String,
-		"NIP":         selNIP.String,
-		"Expiration":  selExpiration.String,
-		"OilCoName":   selOilCoName.String,
-		"DateRemise":  selDateRemise.String,
-		"DateReprise": selDateReprise.String,
-		"Active":      selActive.Bool,
-		"Notes":       selNotes.String,
-	}
-	if jb, err := json.Marshal(backup); err == nil {
-		logger.Info("[DELETE BACKUP] " + string(jb))
-	} else {
-		logger.Info("Failed to marshal delete backup: " + err.Error())
-	}
-
-	// Attempt physical delete from table
-	delQ := `DELETE FROM Fuel.dbo.Cartes WHERE CardId = @cid AND CardNumber = @cn;`
-	if res, err := tx.ExecContext(ctx, delQ, sql.Named("cid", body.CardId), sql.Named("cn", body.CardNumber)); err != nil {
-		logger.Info("Exec error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	} else {
-		if ra, _ := res.RowsAffected(); ra == 0 {
-			respondWithError(w, http.StatusBadRequest, "no rows deleted")
-			return
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		logger.Info("Commit error on cartesDeleteHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	logger.Info(fmt.Sprintf("User %s deleted CardId=%d CardNumber=%s", user, body.CardId, body.CardNumber))
-
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
-}
 func petrolieresAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1129,6 +607,615 @@ FROM Fuel.dbo.BrokerCo
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
+}
+func transactionsAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT run_name
+      ,started_at
+      ,finished_at
+      ,status
+      ,error_message
+      ,total_lines
+	  ,total_imported
+	  ,total_failures
+	  ,duplicate_ids
+	  ,missing_card_ids
+	  ,other_failures
+  FROM Fuel.dbo.TransactionRuns
+
+  order by started_at desc;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		logger.Info("Query error on transactionsAllHandler: " + err.Error())
+		http.Error(w, "query error: "+err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		RunName       string `json:"RunName"`
+		StartedAt     string `json:"StartedAt"`
+		FinishedAt    string `json:"FinishedAt"`
+		Status        string `json:"Status"`
+		ErrorMessage  string `json:"ErrorMessage"`
+		TotalLines    string `json:"TotalLines"`
+		Imported      string `json:"Imported"`
+		Failures      string `json:"Failures"`
+		Duplicates    string `json:"Duplicates"`
+		Missing       string `json:"Missing"`
+		OtherFailures string `json:"OtherFailures"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			run_name         sql.NullString
+			started_at       sql.NullTime
+			finished_at      sql.NullTime
+			status           sql.NullString
+			error_message    sql.NullString
+			total_lines      sql.NullString
+			total_imported   sql.NullString
+			total_failures   sql.NullString
+			duplicate_ids    sql.NullString
+			missing_card_ids sql.NullString
+			other_failures   sql.NullString
+		)
+		if err := rows.Scan(&run_name, &started_at, &finished_at, &status, &error_message, &total_lines, &total_imported, &total_failures, &duplicate_ids, &missing_card_ids, &other_failures); err != nil {
+			logger.Info("Scan error on transactionsAllHandler: " + err.Error())
+			http.Error(w, "scan error: "+err.Error(), 500)
+			return
+		}
+
+		out = append(out, rowOut{
+			RunName:       run_name.String,
+			StartedAt:     started_at.Time.Format("02/01/2006 15:04"),
+			FinishedAt:    finished_at.Time.Format("02/01/2006 15:04"),
+			Status:        status.String,
+			ErrorMessage:  error_message.String,
+			TotalLines:    total_lines.String,
+			Imported:      total_imported.String,
+			Failures:      total_failures.String,
+			Duplicates:    duplicate_ids.String,
+			Missing:       missing_card_ids.String,
+			OtherFailures: other_failures.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		logger.Info("Rows error on transactionsAllHandler: " + err.Error())
+		http.Error(w, "rows error: "+err.Error(), 500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+// POSTs update and manipulate data
+func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Request body
+	type reqBody struct {
+		DriverName string  `json:"driverName"`
+		CardNumber string  `json:"cardNumber"`
+		NIP        string  `json:"NIP"`
+		OilCoName  *string `json:"oilCoName"`
+		Expiration *string `json:"Expiration"`
+		DateRemise *string `json:"DateRemise"`
+		Note       *string `json:"Note"`
+		CSRF       string  `json:"csrf,omitempty"`
+	}
+	var body reqBody
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on cartesAddHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on cartesAddHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	// CSRF: header -> body -> cookie
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to cartesAddHandler")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		return
+	}
+
+	// Generate fresh token
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	}
+
+	// Validate required fields
+	if strings.TrimSpace(body.DriverName) == "" || strings.TrimSpace(body.CardNumber) == "" || strings.TrimSpace(body.NIP) == "" {
+		respondWithError(w, http.StatusBadRequest, "driverName, cardNumber and NIP are required")
+		return
+	}
+	// oilCoName is required because FK_OilCoid is NOT NULL in the DB
+	if body.OilCoName == nil || strings.TrimSpace(*body.OilCoName) == "" {
+		respondWithError(w, http.StatusBadRequest, "oilCoName is required")
+		return
+	}
+
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on cartesAddHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Resolve driverName -> Drivers.id using FirstName + ' ' + LastName
+	var driverId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM Fuel.dbo.Drivers WHERE LTRIM(RTRIM(FirstName + ' ' + LastName)) = @name`, sql.Named("name", strings.TrimSpace(body.DriverName))).Scan(&driverId); err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusBadRequest, "driver not found")
+			return
+		}
+		logger.Info("QueryRow error on cartesAddHandler (resolve driver): " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
+		return
+	}
+
+	// Resolve oil co if provided
+	var oilCoIdParam interface{}
+	if body.OilCoName != nil {
+		oc := strings.TrimSpace(*body.OilCoName)
+		if oc != "" {
+			var oilCoId sql.NullInt64
+			if err := tx.QueryRowContext(ctx, `SELECT id FROM Fuel.dbo.OilCo WHERE OilCoName = @name`, sql.Named("name", oc)).Scan(&oilCoId); err != nil {
+				if err == sql.ErrNoRows {
+					respondWithError(w, http.StatusBadRequest, "oil company not found")
+					return
+				}
+				logger.Info("QueryRow error on cartesAddHandler (resolve oilco): " + err.Error())
+				respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
+				return
+			}
+			if oilCoId.Valid {
+				oilCoIdParam = oilCoId.Int64
+			} else {
+				oilCoIdParam = nil
+			}
+		} else {
+			oilCoIdParam = nil
+		}
+	} else {
+		oilCoIdParam = nil
+	}
+
+	// Prepare nullable params
+	var expirationParam interface{}
+	if body.Expiration != nil {
+		s := strings.TrimSpace(*body.Expiration)
+		if s != "" {
+			expirationParam = s
+		} else {
+			expirationParam = nil
+		}
+	} else {
+		expirationParam = nil
+	}
+	var remiseParam interface{}
+	if body.DateRemise != nil {
+		s := strings.TrimSpace(*body.DateRemise)
+		if s != "" {
+			remiseParam = s
+		} else {
+			remiseParam = nil
+		}
+	} else {
+		remiseParam = nil
+	}
+	var noteParam interface{}
+	if body.Note != nil {
+		s := strings.TrimSpace(*body.Note)
+		if s != "" {
+			noteParam = s
+		} else {
+			noteParam = nil
+		}
+	} else {
+		noteParam = nil
+	}
+
+	// DateReprise should be NULL on add
+
+	insertQ := `
+SET NOCOUNT ON;
+INSERT INTO Fuel.dbo.Cartes (FK_DriverId, CardNumber, NIP, FK_OilCoId, Expiration, DateRemise, DateReprise, Notes)
+OUTPUT INSERTED.CardId
+VALUES (@driverId, @cardNumber, @nip, @oilCoId, TRY_CONVERT(date, @expiration, 120), TRY_CONVERT(date, @dr, 120), NULL, @notes);
+`
+
+	var newId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, insertQ,
+		sql.Named("driverId", sql.NullInt64{Int64: driverId.Int64, Valid: driverId.Valid}),
+		sql.Named("cardNumber", strings.TrimSpace(body.CardNumber)),
+		sql.Named("nip", strings.TrimSpace(body.NIP)),
+		sql.Named("oilCoId", oilCoIdParam),
+		sql.Named("expiration", expirationParam),
+		sql.Named("dr", remiseParam),
+		sql.Named("notes", noteParam),
+	).Scan(&newId); err != nil {
+		logger.Info("Insert error on cartesAddHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on cartesAddHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, ("database error: " + err.Error()))
+		return
+	}
+
+	idVal := 0
+	if newId.Valid {
+		idVal = int(newId.Int64)
+	}
+
+	logger.Info(fmt.Sprintf("User %s added Card CardId=%d CardNumber=%s OperatorNo=%d", user, idVal, body.CardNumber, driverId.Int64))
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "CardId": idVal})
+}
+func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Read body
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on cartesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	type reqBody struct {
+		CardId      int     `json:"CardId"`
+		NIP         string  `json:"NIP"`
+		DateRemise  *string `json:"DateRemise"`
+		DateReprise *string `json:"DateReprise"`
+		Notes       *string `json:"Notes"`
+		CSRF        string  `json:"csrf,omitempty"`
+	}
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on cartesUpdateHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	// CSRF token: try candidates in order (header, body, cookie). Accept first valid.
+	var csrfCandidates []string
+	if h := r.Header.Get("X-CSRF-Token"); h != "" {
+		csrfCandidates = append(csrfCandidates, h)
+	}
+	if body.CSRF != "" {
+		csrfCandidates = append(csrfCandidates, body.CSRF)
+	}
+	if c, err := r.Cookie("csrf_token"); err == nil {
+		if c != nil && c.Value != "" {
+			csrfCandidates = append(csrfCandidates, c.Value)
+		}
+	}
+
+	var validated bool
+	for _, candidate := range csrfCandidates {
+		if csrfManager.ValidateToken(candidate) {
+			validated = true
+			break
+		}
+	}
+	if !validated {
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		logger.Info("Invalid CSRF token provided to cartesUpdateHandler; tried candidates")
+		return
+	}
+
+	// Generate fresh token for client
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	}
+
+	if body.CardId <= 0 {
+		respondWithError(w, http.StatusBadRequest, "invalid CardId")
+		return
+	}
+
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on cartesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Update assumed table Fuel.dbo.Cards (adjust if necessary)
+	updateQ := `
+UPDATE Fuel.dbo.Cartes
+SET NIP = @nip,
+	DateRemise = TRY_CONVERT(date, @dr, 103),
+	DateReprise = TRY_CONVERT(date, @dre, 103),
+	Notes = @notes
+WHERE CardId = @cid;
+`
+	// Prepare nullable params for dates: send NULL when value is nil or empty
+	var drParam interface{}
+	var dreParam interface{}
+	if body.DateRemise != nil {
+		s := strings.TrimSpace(*body.DateRemise)
+		if s != "" {
+			drParam = s
+		} else {
+			drParam = nil
+		}
+	} else {
+		drParam = nil
+	}
+	if body.DateReprise != nil {
+		s := strings.TrimSpace(*body.DateReprise)
+		if s != "" {
+			dreParam = s
+		} else {
+			dreParam = nil
+		}
+	} else {
+		dreParam = nil
+	}
+
+	// Prepare nullable param for Notes
+	var notesParam interface{}
+	if body.Notes != nil {
+		ns := strings.TrimSpace(*body.Notes)
+		if ns != "" {
+			notesParam = ns
+		} else {
+			notesParam = nil
+		}
+	} else {
+		notesParam = nil
+	}
+
+	if _, err := tx.ExecContext(ctx, updateQ,
+		sql.Named("nip", strings.TrimSpace(body.NIP)),
+		sql.Named("dr", drParam),
+		sql.Named("dre", dreParam),
+		sql.Named("notes", notesParam),
+		sql.Named("cid", body.CardId),
+	); err != nil {
+		logger.Info("Exec error on cartesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on cartesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	// Build log values for dates (empty if nil)
+	drLog := ""
+	dreLog := ""
+	notesLog := ""
+	if body.DateRemise != nil {
+		drLog = *body.DateRemise
+	}
+	if body.DateReprise != nil {
+		dreLog = *body.DateReprise
+	}
+	if body.Notes != nil {
+		notesLog = *body.Notes
+	}
+	logger.Info(fmt.Sprintf("User %s updated CardId=%d NIP=%s DateRemise=%s DateReprise=%s Notes=%s", user, body.CardId, body.NIP, drLog, dreLog, notesLog))
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on cartesDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	type reqBody struct {
+		CardId     int    `json:"CardId"`
+		CardNumber string `json:"CardNumber"`
+		Confirm    string `json:"Confirm"` // must equal "SUPPRIMER"
+		CSRF       string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on cartesDeleteHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	// CSRF
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to cartesDeleteHandler")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		return
+	}
+
+	if body.CardId <= 0 || strings.TrimSpace(body.CardNumber) == "" || body.Confirm != "SUPPRIMER" {
+		respondWithError(w, http.StatusBadRequest, "confirmation failed")
+		return
+	}
+
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on cartesDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Read the current row from the view so we can log its full data for restores
+	var (
+		selCardId      sql.NullInt64
+		selFirstName   sql.NullString
+		selLastName    sql.NullString
+		selCardNumber  sql.NullString
+		selNIP         sql.NullString
+		selExpiration  sql.NullString
+		selOilCoName   sql.NullString
+		selDateRemise  sql.NullString
+		selDateReprise sql.NullString
+		selActive      sql.NullBool
+		selNotes       sql.NullString
+	)
+
+	selQ := `
+SELECT CardId, FirstName, LastName, CardNumber, NIP, Expiration, OilCoName, DateRemise, DateReprise, Active, notes
+FROM Fuel.dbo.listCartes
+WHERE CardId = @cid
+`
+	if err := tx.QueryRowContext(ctx, selQ, sql.Named("cid", body.CardId)).Scan(
+		&selCardId,
+		&selFirstName,
+		&selLastName,
+		&selCardNumber,
+		&selNIP,
+		&selExpiration,
+		&selOilCoName,
+		&selDateRemise,
+		&selDateReprise,
+		&selActive,
+		&selNotes,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusBadRequest, "card not found")
+			return
+		}
+		logger.Info("QueryRow error on cartesDeleteHandler (select): " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	// Build a JSON payload of the row for logging (for potential restore)
+	backup := map[string]interface{}{
+		"CardId":      int(selCardId.Int64),
+		"FirstName":   selFirstName.String,
+		"LastName":    selLastName.String,
+		"CardNumber":  selCardNumber.String,
+		"NIP":         selNIP.String,
+		"Expiration":  selExpiration.String,
+		"OilCoName":   selOilCoName.String,
+		"DateRemise":  selDateRemise.String,
+		"DateReprise": selDateReprise.String,
+		"Active":      selActive.Bool,
+		"Notes":       selNotes.String,
+	}
+	if jb, err := json.Marshal(backup); err == nil {
+		logger.Info("[DELETE BACKUP] " + string(jb))
+	} else {
+		logger.Info("Failed to marshal delete backup: " + err.Error())
+	}
+
+	// Attempt physical delete from table
+	delQ := `DELETE FROM Fuel.dbo.Cartes WHERE CardId = @cid AND CardNumber = @cn;`
+	if res, err := tx.ExecContext(ctx, delQ, sql.Named("cid", body.CardId), sql.Named("cn", body.CardNumber)); err != nil {
+		logger.Info("Exec error on cartesDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	} else {
+		if ra, _ := res.RowsAffected(); ra == 0 {
+			respondWithError(w, http.StatusBadRequest, "no rows deleted")
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on cartesDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	logger.Info(fmt.Sprintf("User %s deleted CardId=%d CardNumber=%s", user, body.CardId, body.CardNumber))
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

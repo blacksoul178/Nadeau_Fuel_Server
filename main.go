@@ -53,7 +53,7 @@ func main() {
 	if appConfig.Server.Dev == true {
 		log.Fatal(srv.ListenAndServeTLS("./certs/dev/dev.crt", "./certs/dev/dev.key"))
 	} else {
-		log.Fatal(srv.ListenAndServeTLS("./certs/prod/prod.crt", "./certs/prod/prod.key"))
+		log.Fatal(srv.ListenAndServeTLS("./certs/prod/etiquette2k19.crt", "./certs/prod/etiquette2k19.key"))
 	}
 
 }

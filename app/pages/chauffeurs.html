@@ -18,29 +18,29 @@
         <!-- CSRF Token for logout -->
         <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
         <button type="submit" class="logout-btn">Logout</button>
-        </div>
+      </div>
     </form>
   </header>
 </body>
-    <br>
+<br>
     
-    <section id="content">
-        <h2>Bienvenue {{.Username}}</h2> 
-        {{if .IsAdmin}}
-        <div class="admin-section">
-            <h3>Admin Panel</h3>
-            <p>You have admin access. You can manage:</p>
-            <nav>
-                <a href="/admin">Admin Dashboard</a>
-                <a href="/admin/users">Manage Users</a>
-                <a href="/admin/syncruns">View last syncruns</a>
-                <a href="/admin/logs">View logs</a>
-            </nav>
-        </div>
-        {{end}}
-        <h4>Navigation</h4>
+<section id="content">
+  <h2>Bienvenue {{.Username}}</h2> 
+  {{if .IsAdmin}}
+  <div class="admin-section">
+    <h3>Admin Panel</h3>
+    <p>You have admin access. You can manage:</p>
+    <nav>
+      <a href="/admin">Admin Dashboard</a>
+      <a href="/admin/users">Manage Users</a>
+      <a href="/admin/syncruns">View last syncruns</a>
+      <a href="/admin/logs">View logs</a>
+    </nav>
+  </div>
+  {{end}}
+  <h4>Navigation</h4>
         
-<nav class="tabs">
+  <nav class="tabs">
     <a href="/chauffeurs"    class="tab active">Chauffeurs</a>
     <a href="/cartes"        class="tab">Cartes</a>
     <a href="/transactions"  class="tab">Transactions</a>
@@ -52,32 +52,33 @@
 
 
 <main class="container">
-    <!-- Filters -->
+  <!-- Filters -->
     <section class="panel">
-        <div>
-      <label for="f-name">Nom</label>
-      <input type="text" id="f-name" placeholder="ex.: Martin">
-            </div>
-        <div>
-      <label for="f-group">Groupe</label>
-      <select id="f-group">
-        <option value="">Tous</option>
-        <option value="TGN">TGN</option>
-        <option value="TMC">TMC</option>
-      </select>
+      <div>
+        <label for="f-name">Nom</label>
+        <input type="text" id="f-name" placeholder="ex.: Martin">
       </div>
-        <div>
-      <label for="f-isBroker">Broker?</label>
-      <select id="f-isBroker">
-        <option value="">Tous</option>
-        <option value="true">Oui</option>
-        <option value="false">Non</option>
-      </select>
+      <div>
+        <label for="f-group">Groupe</label>
+        <select id="f-group">
+          <option value="">Tous</option>
+          <option value="TGN">TGN</option>
+          <option value="TMC">TMC</option>
+        </select>
       </div>
+      <div>
+        <label for="f-isBroker">Broker?</label>
+        <select id="f-isBroker">
+          <option value="">Tous</option>
+          <option value="true">Oui</option>
+          <option value="false">Non</option>
+        </select>
+      </div>
+      <button type="syncDrivers" class="sync-btn">Synchroniser</button>
       <div class="spacer"></div>
       <span id="count" style="opacity:.7;"></span>
     </section>
-
+    
     <!-- Table -->
     <section class="panel">
       <table id="tbl" class="table">
@@ -171,6 +172,37 @@
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    function getCookie(name) {
+      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return v ? v.pop() : '';
+    }
+
+    async function syncDrivers() {
+
+      try {
+        const csrf = getCookie('csrf_token');
+        const res = await fetch('/api/drivers/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          }
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        alert('Synchronisation des chauffeurs enclanché, attendre une minute et rafraichir la page ✅');
+      }
+     catch (e) {
+        alert('Erreur du démarrage de la synchronisation: ' + (e.message || e));
+      }
+    }
+
+
     // Init
     (async function init() {
       try {
@@ -179,6 +211,10 @@
         document.getElementById('f-name').addEventListener('input', applyFilter);
         document.getElementById('f-group').addEventListener('change', applyFilter);
         document.getElementById('f-isBroker').addEventListener('change', applyFilter);
+        const SyncDriversBtn = document.querySelector('.sync-btn');
+        if (SyncDriversBtn) {
+          SyncDriversBtn.addEventListener('click', syncDrivers);
+        }
       } catch (e) {
         alert('Erreur chargement: ' + e.message);
       }

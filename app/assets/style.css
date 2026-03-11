@@ -312,10 +312,7 @@ input[type="button"]:active {
   text-align: left;
   color: #ffffff;
 
-  /* comportement de lecture */
-  white-space: nowrap;       /* ne pas casser les mots par défaut */
-  overflow: hidden;
-  text-overflow: ellipsis;
+
 }
 
 #tbl th {
@@ -360,7 +357,11 @@ input[type="button"]:active {
 .col-wide    { width: 400px; }
 
 /* Pour forcer un wrap sur certaines colonnes (ex. Notes) */
-.wrap       { white-space: normal; }
+.wrap       { 
+  white-space: normal; 
+  word-break: break-word;      /* or: break-word for less aggressive */
+  overflow-wrap: break-word;
+}
 .nowrap     { white-space: nowrap; }
 
 /* ====================================================================== */

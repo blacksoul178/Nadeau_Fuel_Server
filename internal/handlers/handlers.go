@@ -5,6 +5,7 @@ import (
 	"Nadeau_Fuel_Server/internal/session"
 	"encoding/base64"
 	"net/http"
+	"os/exec"
 )
 
 // SessionInfo holds the parsed session cookie data
@@ -237,6 +238,8 @@ type PageData struct {
 	ActiveTab string
 }
 
+//page handlers
+
 func chauffeursHandler(w http.ResponseWriter, r *http.Request) {
 	session := GetSessionInfo(r)
 	if session == nil {
@@ -458,4 +461,28 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = tplLogs.Execute(w, data)
+}
+
+// Local Scripts
+func syncDriversHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	logger.Info("Isaac sync run initiated by: " + session.Username)
+	cmd := exec.Command("python", "C:\\TI_Projet_Fuel\\jobs\\Sync_Isaac.py")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, "Sync failed: "+err.Error()+"\n"+string(output), http.StatusInternalServerError)
+		return
+	}
+	w.Write([]byte("Sync successful:\n" + string(output)))
+}
+func importTransactionsHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	logger.Info("Transaction importation initiated by: " + session.Username)
+	cmd := exec.Command("python", "C:\\TI_Projet_Fuel\\jobs\\Transactions\\import_transactions.py")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, "Importation failed: "+err.Error()+"\n"+string(output), http.StatusInternalServerError)
+		return
+	}
+	w.Write([]byte("Importation successful:\n" + string(output)))
 }
