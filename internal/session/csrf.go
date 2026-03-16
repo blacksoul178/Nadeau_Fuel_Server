@@ -68,7 +68,6 @@ func (c *CSRFManager) ValidateToken(token string) bool {
 	}
 
 	// Token is valid, delete it to prevent replay attacks
-	c.store.Delete(token)
 	return true
 }
 
@@ -81,7 +80,7 @@ func (c *CSRFManager) SetTokenCookie(w http.ResponseWriter, token string) {
 		HttpOnly: false, // Must be false so JavaScript can read it
 		Secure:   true,  // Set to true in production (HTTPS only)
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   3600, // 1 hour
+		MaxAge:   600, // 1 hour
 	}
 	http.SetCookie(w, cookie)
 }

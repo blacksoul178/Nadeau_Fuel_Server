@@ -22,6 +22,7 @@ var tplVehicules = template.Must(template.ParseFiles(filepath.Join(filepathRoot,
 var tplBrokers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "brokers.html")))
 var tplSyncruns = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "syncruns.html")))
 var tplLogs = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "logs.html")))
+var tplUsers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "users.html")))
 
 var db *sql.DB
 
@@ -46,6 +47,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
 	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
 	mux.HandleFunc("/admin/logs", requireLogin(logsHandler))
+	mux.HandleFunc("/admin/users", requireLogin(usersHandler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { //root
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
@@ -72,6 +74,11 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	//admin
 	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsAllHandler)))
 	mux.Handle("GET /api/admin/logs", requireLogin(http.HandlerFunc(logsApiHandler)))
+	mux.Handle("GET /api/admin/users/all", requireLogin(http.HandlerFunc(usersAllHandler)))
+	mux.Handle("POST /api/admin/users/create", requireLogin(http.HandlerFunc(usersCreateHandler)))
+	mux.Handle("POST /api/admin/users/delete", requireLogin(http.HandlerFunc(usersDeleteHandler)))
+	mux.Handle("POST /api/admin/users/changePasswordForUser", requireLogin(http.HandlerFunc(usersChangePasswordForUserHandler)))
+	mux.Handle("POST /api/admin/users/update", requireLogin(http.HandlerFunc(usersUpdateHandler)))
 
 }
 

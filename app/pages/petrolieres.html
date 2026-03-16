@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DB Fuel - Pétrolières</title>
+    <title>Fuel'O'Matic Pétrolières</title>
     <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
     <header>
         <div>
-            <h1>DB Fuel - Nadeau</h1>
+            <h1>Fuel'O'Matic Nadeau</h1>
         </div>
         <div class="user-info">
             {{.Username}}
@@ -40,12 +40,14 @@
         <h4>Navigation</h4>
         
         <nav class="tabs">
-          <a href="/chauffeurs"    class="tab">Chauffeurs</a>
+    <a href="/chauffeurs"    class="tab">Chauffeurs</a>
     <a href="/cartes"        class="tab">Cartes</a>
+    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    <a href="/vehicules"     class="tab">Véhicules</a>
+    {{ if or .IsAdmin .IsSuperUser }}
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab active">Pétrolières</a>
-    <a href="/vehicules"     class="tab">Véhicules</a>
-    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    {{end}}
   </nav>
 </section>
 

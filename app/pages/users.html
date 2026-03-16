@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{.CSRFToken}}">
+    <title>Fuel'O'Matic - Manage Users</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    <style>
+        #changePasswordModal, #changeUserPasswordModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #changePasswordModal > div, #changeUserPasswordModal > div {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        #changePasswordModal h3, #changeUserPasswordModal h3 {
+            margin: 0 0 15px 0;
+        }
+
+        #changePasswordModal div > div, #changeUserPasswordModal div > div {
+            margin-bottom: 15px;
+        }
+
+        #changePasswordModal input, #changeUserPasswordModal input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+
+        #changePasswordModal label, #changeUserPasswordModal label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #changePasswordModal button, #changeUserPasswordModal button {
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+
+        #changePasswordModal > div > div:last-child, #changeUserPasswordModal > div > div:last-child {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Fuel'O'Matic Nadeau</h1>
+        </div>
+        <div class="user-info">
+            {{.Username}}
+            <span class="role-badge {{.Role}}">{{.Role}}</span>
+        <form action="/logout" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+        </div>
+    </header>
+    <br>
+
+    <section id="content">
+        <h2>Bienvenue {{.Username}}</h2>
+        {{if .IsAdmin}}
+        <div class="admin-section">
+            <h3>Admin Panel</h3>
+            <p>You have admin access. You can manage:</p>
+            <nav>
+                <a href="/admin">Admin Dashboard</a>
+                <a href="/admin/users">Manage Users</a>
+                <a href="/admin/syncruns">View last syncruns</a>
+                <a href="/admin/logs">View logs</a>
+            </nav>
+        </div>
+        {{end}}
+        <h4>Navigation</h4>
+
+        <nav class="tabs">
+            <a href="/chauffeurs" class="tab">Chauffeurs</a>
+            <a href="/cartes" class="tab">Cartes</a>
+            <a href="/brokers" class="tab">Compagnies Broker</a>
+            <a href="/vehicules" class="tab">Véhicules</a>
+            {{ if or .IsAdmin .IsSuperUser }}
+            <a href="/transactions" class="tab">Transactions</a>
+            <a href="/petrolieres" class="tab">Pétrolières</a>
+            {{end}}
+        </nav>
+    </section>
+
+    <main class="container">
+        <!-- Create User Form -->
+        <section class="panel">
+            <h3>Créer un nouvel utilisateur</h3>
+            <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                <div>
+                    <label for="newUsername">Nom d'utilisateur *</label>
+                    <input type="text" id="newUsername" placeholder="username" />
+                </div>
+                <div>
+                    <label for="newPassword">Mot de passe *</label>
+                    <input type="password" id="newPassword" placeholder="password" />
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                <label style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="newIsAdmin" />
+                    Administrateur
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="newIsSuperUser" />
+                    Super Utilisateur
+                </label>
+            </div>
+            <button id="createUserBtn" type="button">Créer</button>
+        </section>
+
+        <!-- Users List -->
+        <section class="panel">
+            <h3>Utilisateurs existants</h3>
+            <div style="margin-bottom: 10px;">
+                <span id="count" style="opacity:.7;"></span>
+            </div>
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="col-150">Nom d'utilisateur</th>
+                        <th class="col-80">Admin</th>
+                        <th class="col-100">Super User</th>
+                        <th class="col-150">Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+    </main>
+
+    <!-- Edit User Modal -->
+    <div id="changeUserPasswordModal" style="display: none;">
+        <div>
+            <h3>Éditer utilisateur: <span id="userEditTarget"></span></h3>
+            <div>
+                <label for="userNewPassword">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
+                <input type="password" id="userNewPassword" placeholder="Laisser vide pour ne pas changer" />
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="userEditIsAdmin" />
+                    Administrateur
+                </label>
+                <label>
+                    <input type="checkbox" id="userEditIsSuperUser" />
+                    Super Utilisateur
+                </label>
+            </div>
+            <div>
+                <button id="cancelUserEditBtn" type="button">Annuler</button>
+                <button id="submitUserEditBtn" type="button">Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Own Password Modal -->
+    <div id="changePasswordModal" style="display: none;">
+        <div>
+            <h3>Changer mon mot de passe</h3>
+            <div>
+                <label for="currentPassword">Mot de passe actuel *</label>
+                <input type="password" id="currentPassword" placeholder="Entrez votre mot de passe actuel" />
+            </div>
+            <div>
+                <label for="newPassword2">Nouveau mot de passe *</label>
+                <input type="password" id="newPassword2" placeholder="Entrez le nouveau mot de passe" />
+            </div>
+            <div>
+                <label for="newPassword2Confirm">Confirmer nouveau mot de passe *</label>
+                <input type="password" id="newPassword2Confirm" placeholder="Confirmez le nouveau mot de passe" />
+            </div>
+            <div>
+                <button id="cancelPwdBtn" type="button">Annuler</button>
+                <button id="submitPwdBtn" type="button">Changer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+        // Get CSRF token from cookie or meta tag
+        function getCSRF() {
+            const m = document.querySelector('meta[name="csrf-token"]');
+            if (m && m.content) return m.content;
+            const v = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+            if (v) return v.split('=')[1];
+            return '';
+        }
+
+        const state = { data: [] };
+
+        // Fetch all users
+        async function loadAll() {
+            console.log('loadAll() called');
+            try {
+                console.log('Fetching from /api/admin/users/all...');
+                const res = await fetch('/api/admin/users/all', { headers: { 'Accept': 'application/json' } });
+                console.log('Response status:', res.status, res.ok);
+                if (!res.ok) {
+                    const errText = await res.text();
+                    console.error('Error response:', errText);
+                    throw new Error('HTTP ' + res.status + ': ' + errText);
+                }
+                const data = await res.json();
+                console.log('Loaded users:', data);
+                state.data = data || [];
+            } catch (e) {
+                console.error('Error loading users:', e.message || e);
+                state.data = [];
+            }
+        }
+
+        // Render users table
+        function render(rows) {
+            console.log('Rendering rows:', rows);
+            const tb = document.querySelector('#tbl tbody');
+            if (!tb) {
+                console.error('Table tbody not found');
+                return;
+            }
+            tb.innerHTML = '';
+
+            if (!rows || !Array.isArray(rows)) {
+                console.warn('rows is not an array:', rows);
+                rows = [];
+            }
+
+            rows.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(u.SiteUser)}</td>
+                    <td>${u.IsAdmin ? 'Oui' : 'Non'}</td>
+                    <td>${u.IsSuperUser ? 'Oui' : 'Non'}</td>
+                    <td>
+                        <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.SiteUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}">Éditer</button>
+                        <button class="btn-delete" data-userid="${u.id}" data-username="${escapeHtml(u.SiteUser)}">Supprimer</button>
+                    </td>
+                `;
+                tb.appendChild(tr);
+            });
+
+            document.getElementById('count').textContent = rows.length + (rows.length > 1 ? ' utilisateurs' : ' utilisateur');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // Create user
+        document.getElementById('createUserBtn').addEventListener('click', async () => {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const isAdmin = document.getElementById('newIsAdmin').checked;
+            const isSuperUser = document.getElementById('newIsSuperUser').checked;
+
+            if (!username || !password) {
+                alert('Nom d\'utilisateur et mot de passe sont obligatoires');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/users/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                    body: JSON.stringify({ username, password, isAdmin, isSuperUser })
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt);
+                }
+
+                showFlash('Utilisateur créé avec succès.');
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('newIsAdmin').checked = false;
+                document.getElementById('newIsSuperUser').checked = false;
+                await loadAll();
+                render(state.data);
+            } catch (err) {
+                alert('Erreur création utilisateur: ' + err.message);
+            }
+        });
+
+        // Delete user
+        document.addEventListener('click', async (e) => {
+            if (e.target.matches('.btn-delete')) {
+                const userId = e.target.dataset.userid;
+                const username = e.target.dataset.username;
+
+                if (!confirm(`Voulez-vous vraiment supprimer l'utilisateur "${username}"?`)) return;
+
+                try {
+                    const res = await fetch('/api/admin/users/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                        body: JSON.stringify({ id: parseInt(userId) })
+                    });
+
+                    if (!res.ok) {
+                        const txt = await res.text();
+                        throw new Error(txt);
+                    }
+
+                    showFlash('Utilisateur supprimé.');
+                    await loadAll();
+                    render(state.data);
+                } catch (err) {
+                    alert('Erreur suppression: ' + err.message);
+                }
+            }
+
+            if (e.target.matches('.btn-edit')) {
+                const userId = e.target.dataset.userid;
+                const username = e.target.dataset.username;
+                const isAdmin = e.target.dataset.isadmin === 'true';
+                const isSuperUser = e.target.dataset.issuperuser === 'true';
+                
+                showEditUserModal(userId, username, isAdmin, isSuperUser);
+            }
+        });
+
+        // Flash message
+        function showFlash(msg) {
+            const d = document.createElement('div');
+            d.className = 'flash-success';
+            d.textContent = msg;
+            document.body.appendChild(d);
+            setTimeout(() => { d.classList.add('visible'); }, 10);
+            setTimeout(() => { d.classList.remove('visible'); setTimeout(() => d.remove(), 400); }, 3500);
+        }
+
+        // Change password modal
+        const modal = document.getElementById('changePasswordModal');
+        const changePwdBtn = document.getElementById('changePwdBtn');
+        const cancelPwdBtn = document.getElementById('cancelPwdBtn');
+        const submitPwdBtn = document.getElementById('submitPwdBtn');
+
+        if (changePwdBtn) {
+            changePwdBtn.addEventListener('click', () => {
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword2').value = '';
+                document.getElementById('newPassword2Confirm').value = '';
+                if (modal) modal.style.display = 'flex';
+            });
+        }
+
+        if (cancelPwdBtn) {
+            cancelPwdBtn.addEventListener('click', () => {
+                if (modal) modal.style.display = 'none';
+            });
+        }
+
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+
+        submitPwdBtn.addEventListener('click', async () => {
+            const currentPassword = document.getElementById('currentPassword').value.trim();
+            const newPassword = document.getElementById('newPassword2').value.trim();
+            const confirmPassword = document.getElementById('newPassword2Confirm').value.trim();
+
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                alert('Tous les champs sont obligatoires');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                alert('Les nouveaux mots de passe ne correspondent pas');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/users/changePassword', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt);
+                }
+
+                showFlash('Mot de passe changé avec succès.');
+                modal.style.display = 'none';
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        });
+
+        // Change user password modal (for admins)
+        const userPwdModal = document.getElementById('changeUserPasswordModal');
+        const cancelUserPwdBtn = document.getElementById('cancelUserEditBtn');
+        const submitUserPwdBtn = document.getElementById('submitUserEditBtn');
+        let currentUserIdToChange = null;
+
+        function showEditUserModal(userId, username, isAdmin, isSuperUser) {
+            currentUserIdToChange = userId;
+            document.getElementById('userEditTarget').textContent = username;
+            document.getElementById('userNewPassword').value = '';
+            document.getElementById('userEditIsAdmin').checked = isAdmin;
+            document.getElementById('userEditIsSuperUser').checked = isSuperUser;
+            userPwdModal.style.display = 'flex';
+        }
+
+        cancelUserPwdBtn.addEventListener('click', () => {
+            userPwdModal.style.display = 'none';
+        });
+
+        userPwdModal.addEventListener('click', (e) => {
+            if (e.target === userPwdModal) {
+                userPwdModal.style.display = 'none';
+            }
+        });
+
+        submitUserPwdBtn.addEventListener('click', async () => {
+            const newPassword = document.getElementById('userNewPassword').value.trim();
+            const isAdmin = document.getElementById('userEditIsAdmin').checked;
+            const isSuperUser = document.getElementById('userEditIsSuperUser').checked;
+
+            try {
+                const res = await fetch('/api/admin/users/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                    body: JSON.stringify({ userId: parseInt(currentUserIdToChange), newPassword, isAdmin, isSuperUser })
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt);
+                }
+
+                showFlash('Utilisateur mis à jour avec succès.');
+                userPwdModal.style.display = 'none';
+                await loadAll();
+                render(state.data);
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        });
+
+        // Init
+        (async function init() {
+            console.log('Init starting...');
+            try {
+                console.log('Calling loadAll...');
+                await loadAll();
+                console.log('loadAll completed, state.data is:', state.data);
+                render(state.data);
+                console.log('Render completed');
+            } catch (e) {
+                console.error('Init error:', e);
+                alert('Erreur chargement: ' + e.message);
+            }
+        })();
+    </script>
+</body>
+</html>

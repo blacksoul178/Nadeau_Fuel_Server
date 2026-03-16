@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DB Fuel - Véhicules</title>
+    <title>Fuel'O'Matic - Véhicules</title>
     <link rel="stylesheet" href="/assets/style.css">
 </head>
 
 <body>
     <header>
         <div>
-            <h1>DB Fuel - Nadeau</h1>
+            <h1>Fuel'O'Matic - Nadeau</h1>
         </div>
         <div class="user-info">
             {{.Username}}
@@ -43,10 +43,12 @@
 <nav class="tabs">
     <a href="/chauffeurs"    class="tab">Chauffeurs</a>
     <a href="/cartes"        class="tab">Cartes</a>
+    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    <a href="/vehicules"     class="tab active">Véhicules</a>
+    {{ if or .IsAdmin .IsSuperUser }}
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
-    <a href="/vehicules"     class="tab active">Véhicules</a>
-    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    {{end}}
   </nav>
 </section>
 
@@ -84,6 +86,7 @@
       </div>
       <div class="spacer"></div>
       <span id="count" style="opacity:.7;"></span>
+      <button id="reset-filters" style="margin-left: 10px; padding: 5px 10px; cursor: pointer;">Réinitialiser filtres</button>
     </section>
 
     <!-- Table -->
@@ -194,6 +197,14 @@
         const IFTA = parseBoolLoose((document.getElementById('f-IFTA').value || ''));
         const fuel = (document.getElementById('f-fuel').value || '');
 
+        // Save filter state to localStorage
+        try {
+          localStorage.setItem('vehicules_filter_search', document.getElementById('f-search').value || '');
+          localStorage.setItem('vehicules_filter_actif', document.getElementById('f-actif').value || '');
+          localStorage.setItem('vehicules_filter_IFTA', document.getElementById('f-IFTA').value || '');
+          localStorage.setItem('vehicules_filter_fuel', document.getElementById('f-fuel').value || '');
+        } catch (e) {}
+
         let rows = state.data;
 
         if (search) {
@@ -266,6 +277,18 @@
     (async function init() {
       try {
         await loadAll();
+        // Restore filter state from localStorage
+        try {
+          const savedSearch = localStorage.getItem('vehicules_filter_search');
+          const savedActif = localStorage.getItem('vehicules_filter_actif');
+          const savedIFTA = localStorage.getItem('vehicules_filter_IFTA');
+          const savedFuel = localStorage.getItem('vehicules_filter_fuel');
+          
+          if (savedSearch !== null) document.getElementById('f-search').value = savedSearch;
+          if (savedActif !== null) document.getElementById('f-actif').value = savedActif;
+          if (savedIFTA !== null) document.getElementById('f-IFTA').value = savedIFTA;
+          if (savedFuel !== null) document.getElementById('f-fuel').value = savedFuel;
+        } catch (e) {}
         applyFilter();
         setupRowSelection();
         // Debounced search input
@@ -274,6 +297,20 @@
         document.getElementById('f-actif').addEventListener('change', applyFilter);
         document.getElementById('f-IFTA').addEventListener('change', applyFilter);
         document.getElementById('f-fuel').addEventListener('change', applyFilter);
+        // Reset filters button
+        document.getElementById('reset-filters').addEventListener('click', () => {
+          try {
+            localStorage.removeItem('vehicules_filter_search');
+            localStorage.removeItem('vehicules_filter_actif');
+            localStorage.removeItem('vehicules_filter_IFTA');
+            localStorage.removeItem('vehicules_filter_fuel');
+          } catch (e) {}
+          document.getElementById('f-search').value = '';
+          document.getElementById('f-actif').value = '';
+          document.getElementById('f-IFTA').value = 'null';
+          document.getElementById('f-fuel').value = '';
+          applyFilter();
+        });
       } catch (e) {
         alert('Erreur chargement: ' + e.message);
       }

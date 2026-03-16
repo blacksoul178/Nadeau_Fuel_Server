@@ -987,8 +987,8 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	updateQ := `
 UPDATE Fuel.dbo.Cartes
 SET NIP = @nip,
-	DateRemise = TRY_CONVERT(date, @dr, 103),
-	DateReprise = TRY_CONVERT(date, @dre, 103),
+	DateRemise = TRY_CONVERT(date, @dr, 120),
+	DateReprise = TRY_CONVERT(date, @dre, 120),
 	Notes = @notes
 WHERE CardId = @cid;
 `

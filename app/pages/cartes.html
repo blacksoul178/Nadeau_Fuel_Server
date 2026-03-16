@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{.CSRFToken}}">
-    <title>DB Fuel - Cartes</title>
+    <title>Fuel'O'Matic Cartes</title>
     <link rel="stylesheet" href="/assets/style.css">
     
 </head>
 <body>
     <header>
         <div>
-            <h1>DB Fuel - Nadeau</h1>
+            <h1>Fuel'O'Matic Nadeau</h1>
         </div>
         <div class="user-info">
             {{.Username}}
@@ -44,11 +44,13 @@
 <nav class="tabs">
     <a href="/chauffeurs"    class="tab">Chauffeurs</a>
     <a href="/cartes"        class="tab active">Cartes</a>
+    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    <a href="/vehicules"     class="tab">Véhicules</a>
+    {{ if or .IsAdmin .IsSuperUser }}
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
-    <a href="/vehicules"     class="tab">Véhicules</a>
-    <a href="/brokers"       class="tab">Compagnies Broker</a>
-</nav>
+    {{end}}
+  </nav>
 </section>
 
 <main class="container">
@@ -134,6 +136,7 @@
       </div>
       <div class="spacer"></div>
       <span id="count" style="opacity:.7;"></span>
+      <button id="reset-filters" style="margin-left: 10px; padding: 5px 10px; cursor: pointer;">Réinitialiser filtres</button>
     </section>
 
     <!-- Table -->
@@ -286,6 +289,16 @@
         const broker = parseBoolLoose((document.getElementById('f-broker').value || ''));
         const dispatchGroup = (document.getElementById('f-dispatchGroup').value || '');
 
+        // Save filter state to localStorage
+        try {
+          localStorage.setItem('cartes_filter_search', document.getElementById('f-search').value || '');
+          localStorage.setItem('cartes_filter_actif', document.getElementById('f-actif').value || '');
+          localStorage.setItem('cartes_filter_broker', document.getElementById('f-broker').value || '');
+          localStorage.setItem('cartes_filter_dispatchGroup', document.getElementById('f-dispatchGroup').value || '');
+        } catch (e) {
+          // localStorage might be disabled
+        }
+
         let rows = state.data;
 
         if (search) {
@@ -381,20 +394,36 @@
                   // switch to inputs
                   const nipVal = nipCell ? nipCell.textContent.trim() : '';
                   let drVal = drCell ? drCell.textContent.trim() : '';
-                    // If empty, prefill with today's date in dd/MM/YYYY for edit inputs
-                    if (!drVal) {
-                      const _t = new Date();
-                      const _dd = String(_t.getDate()).padStart(2, '0');
-                      const _mm = String(_t.getMonth() + 1).padStart(2, '0');
-                      const _yyyy = _t.getFullYear();
-                      drVal = `${_dd}/${_mm}/${_yyyy}`;
+                  let dreVal = dreCell ? dreCell.textContent.trim() : '';
+                  // Convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD for input type="date"
+                  function toDateInput(val) {
+                    if (!val) return '';
+                    // DD-MM-YYYY
+                    if (/^\d{2}-\d{2}-\d{4}$/.test(val)) {
+                      const [dd, mm, yyyy] = val.split('-');
+                      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
                     }
-                  const dreVal = dreCell ? dreCell.textContent.trim() : '';
+                    // DD/MM/YYYY
+                    if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                      const [dd, mm, yyyy] = val.split('/');
+                      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    }
+                    // Already correct
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+                    return '';
+                  }
+                  // Only default to today if value is empty
+                  function getToday() {
+                    const _t = new Date();
+                    return `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, '0')}-${String(_t.getDate()).padStart(2, '0')}`;
+                  }
+                  const drValDate = toDateInput(drVal) || getToday();
+                  const dreValDate = toDateInput(dreVal) || '';
                   const notesVal = notesCell ? notesCell.textContent.trim() : '';
 
                   if (nipCell) nipCell.parentElement.innerHTML = `<input class="inp-nip" value="${nipVal}">`;
-                  if (drCell) drCell.parentElement.innerHTML = `<input class="inp-dr" value="${drVal}" placeholder="JJ/MM/AAAA">`;
-                  if (dreCell) dreCell.parentElement.innerHTML = `<input class="inp-dre" value="${dreVal}" placeholder="JJ/MM/AAAA">`;
+                  if (drCell) drCell.parentElement.innerHTML = `<input class="inp-dr" type="date" value="${drValDate}">`;
+                  if (dreCell) dreCell.parentElement.innerHTML = `<input class="inp-dre" type="date" value="${dreValDate}">`;
                   if (notesCell) notesCell.innerHTML = `<input class="inp-notes" value="${notesVal}">`;
 
                   btn.textContent = 'Sauvegarder';
@@ -422,9 +451,36 @@
                     if (!res.ok) {
                       const txt = await res.text(); throw new Error(txt || res.statusText);
                     }
-                    // show success message after reload
-                    try { sessionStorage.setItem('flash_cartes', 'Modifications enregistrées.'); } catch(e){}
-                    location.reload();
+                    // Fetch updated data for this card and re-render row
+                    try {
+                      const carteRes = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
+                      if (carteRes.ok) {
+                        const allCartes = await carteRes.json();
+                        const updatedCarte = allCartes.find(c => c.CardId === Number(cardId));
+                        if (updatedCarte) {
+                          // Re-render this row with updated data
+                          const controls = `<button class="btn-edit" data-cardid="${updatedCarte.CardId}">Modifier</button>`;
+                          const deleteBtn = CAN_DELETE ? ` <button class="btn-delete" data-cardid="${updatedCarte.CardId}" data-cardnumber="${updatedCarte.CardNumber}">Supprimer</button>` : '';
+                          row.innerHTML = `
+                            <td>${updatedCarte.Nom ?? ''}</td>
+                            <td>${updatedCarte.Nom_DispatchGroup ?? ''}</td>
+                            <td data-field="CardNumber">${updatedCarte.CardNumber ?? ''}</td>
+                            <td class="cell-nip" data-field="NIP" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.NIP ?? ''}</span></td>
+                            <td data-field="OilCoName">${updatedCarte.OilCoName ?? ''}</td>
+                            <td data-field="Expiration">${updatedCarte.Expiration ?? ''}</td>
+                            <td class="cell-dr" data-field="DateRemise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateRemise ?? ''}</span></td>
+                            <td class="cell-dre" data-field="DateReprise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateReprise ?? ''}</span></td>
+                            <td data-field="Active">${updatedCarte.Active ?? ''}</td>
+                            <td data-field="Notes">${updatedCarte.Notes ?? ''}</td>
+                            <td>${controls}${deleteBtn}</td>
+                          `;
+                          btn.dataset.editing = '0';
+                          showFlash('Modifications enregistrées.');
+                        }
+                      }
+                    } catch (fetchErr) {
+                      alert('Sauvegarde OK, mais erreur lors de la mise à jour de l\'affichage: ' + fetchErr.message);
+                    }
                   } catch (err) {
                     alert('Erreur sauvegarde: ' + err.message);
                   }
@@ -506,6 +562,20 @@
     (async function init() {
       try {
         await loadAll();
+        // Restore filter state from localStorage
+        try {
+          const savedSearch = localStorage.getItem('cartes_filter_search');
+          const savedActif = localStorage.getItem('cartes_filter_actif');
+          const savedBroker = localStorage.getItem('cartes_filter_broker');
+          const savedDispatchGroup = localStorage.getItem('cartes_filter_dispatchGroup');
+          
+          if (savedSearch !== null) document.getElementById('f-search').value = savedSearch;
+          if (savedActif !== null) document.getElementById('f-actif').value = savedActif;
+          if (savedBroker !== null) document.getElementById('f-broker').value = savedBroker;
+          if (savedDispatchGroup !== null) document.getElementById('f-dispatchGroup').value = savedDispatchGroup;
+        } catch (e) {
+          // localStorage might be disabled
+        }
         applyFilter();
         setupRowSelection();
         // populate oil company list
@@ -562,6 +632,20 @@
         document.getElementById('f-actif').addEventListener('change', applyFilter);
         document.getElementById('f-broker').addEventListener('change', applyFilter);
         document.getElementById('f-dispatchGroup').addEventListener('change', applyFilter);
+        // Reset filters button
+        document.getElementById('reset-filters').addEventListener('click', () => {
+          try {
+            localStorage.removeItem('cartes_filter_search');
+            localStorage.removeItem('cartes_filter_actif');
+            localStorage.removeItem('cartes_filter_broker');
+            localStorage.removeItem('cartes_filter_dispatchGroup');
+          } catch (e) {}
+          document.getElementById('f-search').value = '';
+          document.getElementById('f-actif').value = '';
+          document.getElementById('f-broker').value = '';
+          document.getElementById('f-dispatchGroup').value = '';
+          applyFilter();
+        });
         // Pré-remplir le champ DateRemise du formulaire d'ajout avec la date du jour si vide
         try {
           const addDr = document.getElementById('DateRemise');
