@@ -1523,3 +1523,81 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, http.StatusOK, res)
 }
+
+// Sync status handler - returns data from DerniereSynchroComplete view
+func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	query := `
+	SELECT
+		OilCoName,
+		DerniereSynchro,
+		DerniereTransaction,
+		JoursDepuisSynchro
+	FROM Fuel.dbo.DerniereSynchroComplete
+	ORDER BY OilCoName ASC
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		logger.Info("Query error on syncStatusHandler: " + err.Error())
+		http.Error(w, "query error: "+err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+
+	type SyncStatus struct {
+		OilCoName           string `json:"OilCoName"`
+		DerniereSynchro     string `json:"DerniereSynchro"`
+		DerniereTransaction string `json:"DerniereTransaction"`
+		JoursDepuisSynchro  int    `json:"JoursDepuisSynchro"`
+	}
+	out := make([]SyncStatus, 0, 256)
+
+	for rows.Next() {
+		var (
+			oilCoName           sql.NullString
+			derniereSynchro     sql.NullTime
+			derniereTransaction sql.NullTime
+			joursDepuisSynchro  sql.NullInt64
+		)
+		if err := rows.Scan(&oilCoName, &derniereSynchro, &derniereTransaction, &joursDepuisSynchro); err != nil {
+			logger.Info("Scan error on syncStatusHandler: " + err.Error())
+			http.Error(w, "scan error: "+err.Error(), 500)
+			return
+		}
+
+		syncStatus := SyncStatus{
+			OilCoName: oilCoName.String,
+		}
+
+		if derniereSynchro.Valid {
+			syncStatus.DerniereSynchro = derniereSynchro.Time.Format("2006-01-02T15:04:05")
+		}
+
+		if derniereTransaction.Valid {
+			syncStatus.DerniereTransaction = derniereTransaction.Time.Format("2006-01-02T15:04:05")
+		}
+
+		if joursDepuisSynchro.Valid {
+			syncStatus.JoursDepuisSynchro = int(joursDepuisSynchro.Int64)
+		}
+
+		out = append(out, syncStatus)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.Info("Rows error on syncStatusHandler: " + err.Error())
+		http.Error(w, "rows error: "+err.Error(), 500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}

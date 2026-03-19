@@ -59,6 +59,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("GET /api/brokers/all", requireLogin(http.HandlerFunc(brokersAllHandler)))
 	mux.Handle("GET /api/cartes/all", requireLogin(http.HandlerFunc(cartesAllHandler)))
 	mux.Handle("GET /api/transactions/all", requireLogin(http.HandlerFunc(transactionsAllHandler)))
+	mux.Handle("GET /api/transactions/sync-status", requireLogin(http.HandlerFunc(syncStatusHandler)))
 
 	//Post API
 	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
