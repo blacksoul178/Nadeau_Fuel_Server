@@ -8,76 +8,53 @@
 
 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-    }
-
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-top: 20px;
-        border: 2px solid #555;
-    }
-
-    th, td {
-        border: 1px solid #888;
-        padding: 10px;
-        text-align: left;
-    }
-
-    th {
-        background: #3a3a3a;
-        color: white;
-    }
-
     /* Sync table specific styling */
-    #sync-table {
-        max-width: 900px;
-        margin-top: 15px;
-        margin-bottom: 30px;
-        border: 2px solid #555;
-    }
+#sync-table {
+    max-width: 900px;
+    margin-top: 15px;
+    margin-bottom: 30px;
+    border: 2px solid #555;
+}
 
-    #sync-table th, #sync-table td {
-        padding: 12px 8px;
-        font-size: 14px;
-        border: 1px solid #888;
-    }
+#sync-table th, #sync-table td {
+    padding: 12px 8px;
+    font-size: 14px;
+    border: 1px solid #888;
+}
 
-    #sync-table th {
-        background-color: #2c3e50;
-        font-weight: bold;
-    }
+#sync-table th {
+    background-color: #2c3e50;
+    font-weight: bold;
+}
 
-    /* Colors depending on rating - applied to entire row - warm tones */
-    tr.rating-1 {
-        background-color: #8dd89d; /* warm green */
-        font-weight: 600;
-    }
-    tr.rating-2 {
-        background-color: #e0c09f; /* warm tan */
-        font-weight: 600;
-    }
-    tr.rating-3 {
-        background-color: #d9a8a8; /* warm rose */
-        color: #2a2a2a;
-        font-weight: 600;
-    }
+/* Colors depending on rating - applied to entire row - warm tones */
+tr.rating-1 {
+    background-color: #8dd89d; /* warm green */
+    font-weight: 600;
+}
+tr.rating-2 {
+    background-color: #e0c09f; /* warm tan */
+    font-weight: 600;
+}
+tr.rating-3 {
+    background-color: #d9a8a8; /* warm rose */
+    color: #2a2a2a;
+    font-weight: 600;
+}
 
-    /* Original rating classes for other tables */
-    .rating-1 {
-        background-color: #8dd89d; /* warm green */
-        font-weight: 600;
-    }
-    .rating-2 {
-        background-color: #e0c09f; /* warm tan */
-        font-weight: 600;
-    }
-    .rating-3 {
-        background-color: #d9a8a8; /* warm rose */
-        font-weight: 600;
-    }
+/* Original rating classes for other tables */
+.rating-1 {
+    background-color: #8dd89d; /* warm green */
+    font-weight: 600;
+}
+.rating-2 {
+    background-color: #e0c09f; /* warm tan */
+    font-weight: 600;
+}
+.rating-3 {
+    background-color: #d9a8a8; /* warm rose */
+    font-weight: 600;
+}
 </style>
 
 </head>
@@ -119,9 +96,12 @@
     <a href="/cartes"        class="tab">Cartes</a>
     <a href="/brokers"       class="tab">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
+    <a href="/taux"   class="tab">Taux</a>
     {{ if or .IsAdmin .IsSuperUser }}
+    <div class="tab-spacer"></div>
     <a href="/transactions"  class="tab active">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
+    <a href="/prixFuel"   class="tab">Prix Fuel</a>
     {{end}}
   </nav>
 </section>
@@ -130,11 +110,11 @@
 <main class="container">
   <!-- Filters -->
   <section class="panel">
-    <div>
+
       <label for="f-name">Importation de transactions</label>
       <button type="importTransactions" class="importTrans-btn">Importer les transactions</button>
-      </div>     
-         <div>
+  
+         
 <Labelf for="status">État des synchronisations</Label>
     
 <table id="sync-table">
@@ -151,8 +131,6 @@
         <!-- Rows inserted by JS -->
     </tbody>
 </table>
-</div>
-</div>
     </section>
 
     <!-- Table -->

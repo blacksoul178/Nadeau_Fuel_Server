@@ -44,9 +44,12 @@
     <a href="/cartes"        class="tab">Cartes</a>
     <a href="/brokers"       class="tab active">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
+    <a href="/taux"   class="tab">Taux</a>
     {{ if or .IsAdmin .IsSuperUser }}
+    <div class="tab-spacer"></div>
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
+    <a href="/prixFuel"   class="tab">Prix Fuel</a>
     {{end}}
   </nav>
 </section>

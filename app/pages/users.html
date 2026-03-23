@@ -87,7 +87,7 @@
             <p>You have admin access. You can manage:</p>
             <nav>
                 <a href="/admin">Admin Dashboard</a>
-                <a href="/admin/users">Manage Users</a>
+                <a href="/admin/users" class="tab active">Manage Users</a>
                 <a href="/admin/syncruns">View last syncruns</a>
                 <a href="/admin/logs">View logs</a>
             </nav>
@@ -100,9 +100,12 @@
             <a href="/cartes" class="tab">Cartes</a>
             <a href="/brokers" class="tab">Compagnies Broker</a>
             <a href="/vehicules" class="tab">Véhicules</a>
+            <a href="/taux"   class="tab">Taux</a>
             {{ if or .IsAdmin .IsSuperUser }}
+            <div class="tab-spacer"></div>
             <a href="/transactions" class="tab">Transactions</a>
             <a href="/petrolieres" class="tab">Pétrolières</a>
+            <a href="/prixFuel"   class="tab">Prix Fuel</a>
             {{end}}
         </nav>
     </section>

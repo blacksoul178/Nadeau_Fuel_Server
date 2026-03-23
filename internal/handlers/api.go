@@ -701,6 +701,120 @@ SELECT run_name
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
+func tauxAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT
+    OilCoName,
+	Compte
+FROM Fuel.dbo.OilCo
+ORDER BY OilCoName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on petrolieresAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		OilCoName string `json:"OilCoName"`
+		Compte    string `json:"Compte"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			OilCoName sql.NullString
+			Compte    sql.NullString
+		)
+		if err := rows.Scan(&OilCoName, &Compte); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on petrolieresAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			OilCoName: OilCoName.String,
+			Compte:    Compte.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on petrolieresAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT
+    OilCoName,
+	Compte
+FROM Fuel.dbo.OilCo
+ORDER BY OilCoName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on petrolieresAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		OilCoName string `json:"OilCoName"`
+		Compte    string `json:"Compte"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			OilCoName sql.NullString
+			Compte    sql.NullString
+		)
+		if err := rows.Scan(&OilCoName, &Compte); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on petrolieresAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			OilCoName: OilCoName.String,
+			Compte:    Compte.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on petrolieresAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
 
 // POSTs update and manipulate data
 func cartesAddHandler(w http.ResponseWriter, r *http.Request) {

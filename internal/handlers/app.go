@@ -23,6 +23,8 @@ var tplBrokers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "
 var tplSyncruns = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "syncruns.html")))
 var tplLogs = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "logs.html")))
 var tplUsers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "users.html")))
+var tplTaux = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "taux.html")))
+var tplPrixFuel = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "prixFuel.html")))
 
 var db *sql.DB
 
@@ -45,6 +47,8 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/petrolieres", requireLogin(petrolieresHandler))
 	mux.HandleFunc("/vehicules", requireLogin(vehiculesHandler))
 	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
+	mux.HandleFunc("/taux", requireLogin(tauxHandler))
+	mux.HandleFunc("/prixFuel", requireLogin(prixFuelHandler))
 	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
 	mux.HandleFunc("/admin/logs", requireLogin(logsHandler))
 	mux.HandleFunc("/admin/users", requireLogin(usersHandler))
@@ -60,6 +64,8 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("GET /api/cartes/all", requireLogin(http.HandlerFunc(cartesAllHandler)))
 	mux.Handle("GET /api/transactions/all", requireLogin(http.HandlerFunc(transactionsAllHandler)))
 	mux.Handle("GET /api/transactions/sync-status", requireLogin(http.HandlerFunc(syncStatusHandler)))
+	mux.Handle("GET /api/taux/all", requireLogin(http.HandlerFunc(tauxAllHandler)))
+	mux.Handle("GET /api/prixFuel/all", requireLogin(http.HandlerFunc(prixFuelAllHandler)))
 
 	//Post API
 	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
