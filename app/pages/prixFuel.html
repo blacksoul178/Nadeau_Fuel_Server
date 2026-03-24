@@ -54,3 +54,301 @@
     {{end}}
   </nav>
 </section>
+
+<main class="container">
+<label for="viewSelector"><strong>Choisir un tableau:</strong></label>
+<select id="viewSelector">
+    <option value="globalJour">Prix global / jours</option>
+    <option value="globalSemaine">Prix global / semaines</option>
+    <option value="diffJour">Différenciel / jours</option>
+    <option value="diffSemaine">Différentiel / semaines</option>
+    <option value="jour">Prix / jours</option>
+    <option value="semaine">Prix / semaines</option>
+</select>
+
+    <section class="panel">
+        <table id="tbl" class="table">
+            <thead id="tblHead"></thead>
+            <tbody id="tblBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const globalJour = {
+        headers: ["Date", "Prix Moyen Harnois", "Diff. Esso", "Diff Petro", "Diff Ultramar", "Diff Irving", "Diff Belisle"],
+        rows: []
+    };
+    const globalSemaine = {
+        headers: ["Année", "Semaine", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+        rows: []
+    }
+    const diffJour = {
+        headers: ["Date", "Ville", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+        rows: []
+    }
+    const diffSemaine = {
+        headers: ["Année", "Semaine", "Ville", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+        rows: []
+    }
+    const jour = {
+        headers: ["Date", "Pétrolière", "Ville", "PrixMoyen"],
+        rows: []
+    }
+    const semaine = {
+        headers: ["Année", "Semaine", "Pétrolière", "Ville", "PrixMoyen"],
+        rows: []
+    }
+
+    async function loadGlobalJour() {
+        const response = await fetch("api/prixFuel/globalJour");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Date.slice(0, 10), d.Prix_Harnois, d.Diff_Esso, d.Diff_Petro, d.Diff_Ultramar, d.Diff_Irving, d.Diff_Belisle
+        ]);
+
+        //Inject into dataset
+        datasets.globalJour = {
+            headers: ["Date", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+            rows: rows
+        }
+
+        renderTable("globalJour")
+    };
+
+    async function loadGlobalSemaine() {
+        const response = await fetch("api/prixFuel/globalSemaine");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Annee,
+            d.Semaine, 
+            d.Prix_Harnois, 
+            d.Diff_Esso,
+            d.Diff_Petro,
+            d.Diff_Ultramar,
+            d.Diff_Irving,
+            d.Diff_Belisle
+        ]);
+
+        //Inject into dataset
+        datasets.globalSemaine = {
+            headers: ["Année", "Semaine", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+            rows: rows
+        }
+
+        renderTable("globalSemaine")
+    };
+
+    async function loadDiffJour() {
+        const response = await fetch("api/prixFuel/diffJour");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Date.slice(0, 10), d.Ville, d.Prix_Harnois, d.Diff_Esso, d.Diff_Petro, d.Diff_Ultramar, d.Diff_Irving, d.Diff_Belisle
+        ]);
+
+        //Inject into dataset
+        datasets.diffJour = {
+            headers: ["Date", "Ville", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+            rows: rows
+        }
+
+        renderTable("diffJour")
+    };
+
+    async function loadDiffSemaine() {
+        const response = await fetch("api/prixFuel/diffSemaine");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Annee, d.Semaine, d.Ville, d.Prix_Harnois, d.Diff_Esso, d.Diff_Petro, d.Diff_Ultramar, d.Diff_Irving, d.Diff_Belisle
+        ]);
+
+        //Inject into dataset
+        datasets.diffSemaine = {
+            headers: ["Année", "Semaine", "Ville", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+            rows: rows
+        }
+
+        renderTable("diffSemaine")
+    };
+
+    async function loadJour() {
+        const response = await fetch("api/prixFuel/jour");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Date.slice(0, 10), d.Petroliere, d.Ville, d.PrixMoyen,
+        ]);
+
+        //Inject into dataset
+        datasets.jour = {
+            headers: ["Date", "Pétrolière", "Ville", "PrixMoyen"],
+            rows: rows
+        }
+
+        renderTable("jour")
+    };
+
+    async function loadSemaine() {
+        const response = await fetch("api/prixFuel/semaine");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Annee, d.Semaine, d.Petroliere, d.Ville, d.PrixMoyen,
+            ]);
+
+        //Inject into dataset
+        datasets.semaine = {
+            headers: ["Année", "Semaine", "Pétrolière", "Ville", "PrixMoyen"],
+            rows: rows
+        }
+
+        renderTable("semaine")
+    };
+
+    //Map selection to dataset
+    const datasets = {
+        globalJour,
+        globalSemaine,
+        diffJour,
+        diffSemaine,
+        jour,
+        semaine,
+    };
+
+    // Load data for a specific view if not already loaded
+    async function loadDataForView(datasetKey) {
+        const data = datasets[datasetKey];
+        
+        // Only load if rows are empty
+        if (data.rows.length === 0) {
+            switch (datasetKey) {
+                case 'globalJour':
+                    await loadGlobalJour();
+                    break;
+                case 'globalSemaine':
+                    await loadGlobalSemaine();
+                    break;
+                case 'diffJour':
+                    await loadDiffJour();
+                    break;
+                case 'diffSemaine':
+                    await loadDiffSemaine();
+                    break;
+                case 'jour':
+                    await loadJour();
+                    break;
+                case 'semaine':
+                    await loadSemaine();
+                    break;
+            }
+        }
+    }
+
+    //render dataset into table
+    async function renderTable(datasetKey){
+        await loadDataForView(datasetKey);
+        
+        const data = datasets[datasetKey];
+        const head = document.getElementById("tblHead");
+        const body = document.getElementById("tblBody");
+        const diffFormatingList = ["globalJour", "globalSemaine", "diffJour", "diffSemaine"];
+
+        //clear table
+        head.innerHTML = "";
+        body.innerHTML = "";
+
+        //Build header
+        let headerHTML = "<tr>";
+        data.headers.forEach(h => {
+        headerHTML += `<th>${h}</th>`;
+        });
+        headerHTML += "</tr>";
+        head.innerHTML = headerHTML;
+        
+        if (diffFormatingList.includes(datasetKey)){
+            //build rows with color formatting only on Diff columns
+            
+            data.rows.forEach(row => {
+                let rowHTML = "<tr>";
+
+                row.forEach((cell, cellIndex) => {
+                    let style = "";
+                    
+                    // Only apply color formatting to columns with "Diff" in the header
+                    const columnHeader = data.headers[cellIndex] || "";
+                    if (columnHeader.includes("Diff")) {
+                        // Convert to number if possible
+                        const num = parseFloat(cell);
+
+                        if (!isNaN(num)) {
+                            if (num > 0) {
+                                style = 'style="color: #00b300; font-weight: bold;"';   // lush green
+                            } else if (num < 0) {
+                                style = 'style="color: #cc0000; font-weight: bold;"';   // bold red
+                            }
+                        }
+                    }
+
+                    rowHTML += `<td ${style}>${cell ?? ""}</td>`;
+                });
+
+                rowHTML += "</tr>";
+                body.innerHTML += rowHTML;
+            });
+        } else {
+        // Build the rows
+        data.rows.forEach(row => {
+            let rowHTML = "<tr>";
+            row.forEach(cell => {
+                rowHTML += `<td>${cell}</td>`;
+            });
+            rowHTML += "</tr>";
+            body.innerHTML += rowHTML;
+        });
+        }
+    }
+
+    function setViewSelector() {
+        try {
+          localStorage.setItem('prixFuelviewSelector', document.getElementById('viewSelector').value || '');
+          } catch (e) {}
+    }
+
+    // 4️⃣ Bind dropdown change event
+    document.getElementById("viewSelector").addEventListener("change", async function () {
+        await renderTable(this.value);
+        setViewSelector(this.value);
+    });
+
+    (async function init(){
+      try {
+        // Restore last selected view from localStorage
+        const last = localStorage.getItem('prixFuelviewSelector');
+        const viewToLoad = last || 'globalJour';
+        
+        // Set the selector to the saved value
+        document.getElementById('viewSelector').value = viewToLoad;
+        
+        // Render the selected view (data will load on demand)
+        await renderTable(viewToLoad);
+        
+      } catch (e) {
+        alert('Erreur de chargement: ' + e.message);
+      }
+    })();
+
+
+</script>
+
+</body>
+</html>

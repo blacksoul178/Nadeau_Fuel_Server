@@ -54,3 +54,64 @@
     {{end}}
   </nav>
 </section>
+
+
+<main class="container">
+<section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th class="col-120">Année</th>
+            <th class="col-80">Semaine</th>
+            <th class="col-200">Prix Moyen Diesel</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+
+<script>
+    //Fetch Taux all week 
+    const state = { data: [] };
+
+ async function loadAll() {
+      const res = await fetch('/api/taux/allWeek', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      state.data = await res.json();
+    }
+
+
+    function render(rows) {
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="col-120">${r.Annee ?? ''}</td>
+          <td>${r.Semaine ?? ''}</td>
+          <td>${r.PrixMoyen ?? ''}</td>
+          `;
+          // Add click listener to toggle selection
+        tr.addEventListener('click', function() {
+          this.classList.toggle('selected');
+        });
+        tb.appendChild(tr);
+      });
+    }
+
+    // Init
+    (async function init() {
+      try {
+        await loadAll();
+        let rows = state.data
+        render(rows)
+      } catch (e) {
+        alert('Erreur de chargement: ' + e.message);
+      }
+    })();
+
+</script>
+</body>
+</html>

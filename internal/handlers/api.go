@@ -701,7 +701,7 @@ SELECT run_name
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
-func tauxAllHandler(w http.ResponseWriter, r *http.Request) {
+func tauxAllWeekHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -712,53 +712,56 @@ func tauxAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT
-    OilCoName,
-	Compte
-FROM Fuel.dbo.OilCo
-ORDER BY OilCoName;
+SELECT TOP (52)
+    Annee, Semaine, PrixMoyen_AllPetro
+FROM
+fuel.dbo.v_PrixFuel_Avg_Semaine_All
+order by Annee, Semaine desc
 `
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		http.Error(w, "query error: "+err.Error(), 500)
-		logger.Info("Query error on petrolieresAllHandler: " + err.Error())
+		logger.Info("Query error on TauxAllWeekHandler: " + err.Error())
 		return
 	}
 	defer rows.Close()
 
 	type rowOut struct {
-		OilCoName string `json:"OilCoName"`
-		Compte    string `json:"Compte"`
+		Annee     string `json:"Annee"`
+		Semaine   string `json:"Semaine"`
+		PrixMoyen string `json:"PrixMoyen"`
 	}
 	out := make([]rowOut, 0, 256)
 
 	for rows.Next() {
 		var (
-			OilCoName sql.NullString
-			Compte    sql.NullString
+			Annee     sql.NullString
+			Semaine   sql.NullString
+			PrixMoyen sql.NullString
 		)
-		if err := rows.Scan(&OilCoName, &Compte); err != nil {
+		if err := rows.Scan(&Annee, &Semaine, &PrixMoyen); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
-			logger.Info("Scan error on petrolieresAllHandler: " + err.Error())
+			logger.Info("Scan error on TauxAllWeekHandler: " + err.Error())
 			return
 		}
 
 		out = append(out, rowOut{
-			OilCoName: OilCoName.String,
-			Compte:    Compte.String,
+			Annee:     Annee.String,
+			Semaine:   Semaine.String,
+			PrixMoyen: PrixMoyen.String,
 		})
 	}
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
-		logger.Info("Rows error on petrolieresAllHandler: " + err.Error())
+		logger.Info("Rows error on TauxAllWeekHandler: " + err.Error())
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
-func prixFuelAllHandler(w http.ResponseWriter, r *http.Request) {
+func prixFuelGlobalSemaineHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -769,46 +772,489 @@ func prixFuelAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT
-    OilCoName,
-	Compte
-FROM Fuel.dbo.OilCo
-ORDER BY OilCoName;
+SELECT [Annee]
+      ,[Semaine]
+      ,[Prix_Harnois]
+      ,[Diff_Esso]
+      ,[Diff_Petro]
+      ,[Diff_Ultramar]
+      ,[Diff_Irving]
+      ,[Diff_Belisle]
+  FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalSemaine]
+  order by Annee, Semaine desc
 `
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		http.Error(w, "query error: "+err.Error(), 500)
-		logger.Info("Query error on petrolieresAllHandler: " + err.Error())
+		logger.Info("Query error on PrixFuelGlobalSemaineHandler: " + err.Error())
 		return
 	}
 	defer rows.Close()
 
 	type rowOut struct {
-		OilCoName string `json:"OilCoName"`
-		Compte    string `json:"Compte"`
+		Annee         string `json:"Annee"`
+		Semaine       string `json:"Semaine"`
+		Prix_Harnois  string `json:"Prix_Harnois"`
+		Diff_Esso     string `json:"Diff_Esso"`
+		Diff_Petro    string `json:"Diff_Petro"`
+		Diff_Ultramar string `json:"Diff_Ultramar"`
+		Diff_Irving   string `json:"Diff_Irving"`
+		Diff_Belisle  string `json:"Diff_Belisle"`
 	}
 	out := make([]rowOut, 0, 256)
 
 	for rows.Next() {
 		var (
-			OilCoName sql.NullString
-			Compte    sql.NullString
+			Annee         sql.NullString
+			Semaine       sql.NullString
+			Prix_Harnois  sql.NullString
+			Diff_Esso     sql.NullString
+			Diff_Petro    sql.NullString
+			Diff_Ultramar sql.NullString
+			Diff_Irving   sql.NullString
+			Diff_Belisle  sql.NullString
 		)
-		if err := rows.Scan(&OilCoName, &Compte); err != nil {
+		if err := rows.Scan(
+			&Annee,
+			&Semaine,
+			&Prix_Harnois,
+			&Diff_Esso,
+			&Diff_Petro,
+			&Diff_Ultramar,
+			&Diff_Irving,
+			&Diff_Belisle,
+		); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
-			logger.Info("Scan error on petrolieresAllHandler: " + err.Error())
+			logger.Info("Scan error on prixFuelGlobalSemaineHandler: " + err.Error())
 			return
 		}
 
 		out = append(out, rowOut{
-			OilCoName: OilCoName.String,
-			Compte:    Compte.String,
+			Annee:         Annee.String,
+			Semaine:       Semaine.String,
+			Prix_Harnois:  Prix_Harnois.String,
+			Diff_Esso:     Diff_Esso.String,
+			Diff_Petro:    Diff_Petro.String,
+			Diff_Ultramar: Diff_Ultramar.String,
+			Diff_Irving:   Diff_Irving.String,
+			Diff_Belisle:  Diff_Belisle.String,
 		})
 	}
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
-		logger.Info("Rows error on petrolieresAllHandler: " + err.Error())
+		logger.Info("Rows error on PrixFuelGlobalSemaineHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelGlobalJourHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT TOP (365) [Date]
+      ,[Prix_Harnois]
+      ,[Diff_Esso]
+      ,[Diff_Petro]
+      ,[Diff_Ultramar]
+      ,[Diff_Irving]
+      ,[Diff_Belisle]
+  FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalJour]
+  order by [Date] desc
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelGlobalJourHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date          string `json:"Date"`
+		Prix_Harnois  string `json:"Prix_Harnois"`
+		Diff_Esso     string `json:"Diff_Esso"`
+		Diff_Petro    string `json:"Diff_Petro"`
+		Diff_Ultramar string `json:"Diff_Ultramar"`
+		Diff_Irving   string `json:"Diff_Irving"`
+		Diff_Belisle  string `json:"Diff_Belisle"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date          sql.NullString
+			Prix_Harnois  sql.NullString
+			Diff_Esso     sql.NullString
+			Diff_Petro    sql.NullString
+			Diff_Ultramar sql.NullString
+			Diff_Irving   sql.NullString
+			Diff_Belisle  sql.NullString
+		)
+		if err := rows.Scan(
+			&Date,
+			&Prix_Harnois,
+			&Diff_Esso,
+			&Diff_Petro,
+			&Diff_Ultramar,
+			&Diff_Irving,
+			&Diff_Belisle,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelGlobalJourlHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:          Date.String,
+			Prix_Harnois:  Prix_Harnois.String,
+			Diff_Esso:     Diff_Esso.String,
+			Diff_Petro:    Diff_Petro.String,
+			Diff_Ultramar: Diff_Ultramar.String,
+			Diff_Irving:   Diff_Irving.String,
+			Diff_Belisle:  Diff_Belisle.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelGlobalJourHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelDiffSemaineHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT TOP (52) [Annee]
+      ,[Semaine]
+      ,[Ville]
+      ,[Prix_Harnois]
+      ,[Diff_Esso]
+      ,[Diff_Petro]
+      ,[Diff_Ultramar]
+      ,[Diff_Irving]
+      ,[Diff_Belisle]
+  FROM [Fuel].[dbo].[v_PrixFuel_Diff_semaine]
+  order by Annee, Semaine desc
+
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelDiffSemaineHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Annee         string `json:"Annee"`
+		Semaine       string `json:"Semaine"`
+		Ville         string `json:"Ville"`
+		Prix_Harnois  string `json:"Prix_Harnois"`
+		Diff_Esso     string `json:"Diff_Esso"`
+		Diff_Petro    string `json:"Diff_Petro"`
+		Diff_Ultramar string `json:"Diff_Ultramar"`
+		Diff_Irving   string `json:"Diff_Irving"`
+		Diff_Belisle  string `json:"Diff_Belisle"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Annee         sql.NullString
+			Semaine       sql.NullString
+			Ville         sql.NullString
+			Prix_Harnois  sql.NullString
+			Diff_Esso     sql.NullString
+			Diff_Petro    sql.NullString
+			Diff_Ultramar sql.NullString
+			Diff_Irving   sql.NullString
+			Diff_Belisle  sql.NullString
+		)
+		if err := rows.Scan(
+			&Annee,
+			&Semaine,
+			&Ville,
+			&Prix_Harnois,
+			&Diff_Esso,
+			&Diff_Petro,
+			&Diff_Ultramar,
+			&Diff_Irving,
+			&Diff_Belisle,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on prixFuelDiffSemaineHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Annee:         Annee.String,
+			Semaine:       Semaine.String,
+			Ville:         Ville.String,
+			Prix_Harnois:  Prix_Harnois.String,
+			Diff_Esso:     Diff_Esso.String,
+			Diff_Petro:    Diff_Petro.String,
+			Diff_Ultramar: Diff_Ultramar.String,
+			Diff_Irving:   Diff_Irving.String,
+			Diff_Belisle:  Diff_Belisle.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelDiffSemaineHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelDiffJourHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT [Date]
+      ,[Ville]
+      ,[Prix_Harnois]
+      ,[Diff_Esso]
+      ,[Diff_Petro]
+      ,[Diff_Ultramar]
+      ,[Diff_Irving]
+      ,[Diff_Belisle]
+  FROM [Fuel].[dbo].[v_PrixFuel_Diff_Jour]
+  Order by [date] desc
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelDiffJourHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date          string `json:"Date"`
+		Ville         string `json:"Ville"`
+		Prix_Harnois  string `json:"Prix_Harnois"`
+		Diff_Esso     string `json:"Diff_Esso"`
+		Diff_Petro    string `json:"Diff_Petro"`
+		Diff_Ultramar string `json:"Diff_Ultramar"`
+		Diff_Irving   string `json:"Diff_Irving"`
+		Diff_Belisle  string `json:"Diff_Belisle"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date          sql.NullString
+			Ville         sql.NullString
+			Prix_Harnois  sql.NullString
+			Diff_Esso     sql.NullString
+			Diff_Petro    sql.NullString
+			Diff_Ultramar sql.NullString
+			Diff_Irving   sql.NullString
+			Diff_Belisle  sql.NullString
+		)
+		if err := rows.Scan(
+			&Date,
+			&Ville,
+			&Prix_Harnois,
+			&Diff_Esso,
+			&Diff_Petro,
+			&Diff_Ultramar,
+			&Diff_Irving,
+			&Diff_Belisle,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelDiffJourHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:          Date.String,
+			Ville:         Ville.String,
+			Prix_Harnois:  Prix_Harnois.String,
+			Diff_Esso:     Diff_Esso.String,
+			Diff_Petro:    Diff_Petro.String,
+			Diff_Ultramar: Diff_Ultramar.String,
+			Diff_Irving:   Diff_Irving.String,
+			Diff_Belisle:  Diff_Belisle.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelDiffJourHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelSemaineHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT [Annee]
+      ,[Semaine]
+      ,[Petroliere]
+      ,[Ville]
+      ,[PrixMoyen]
+  FROM [Fuel].[dbo].[v_PrixFuel_semaine]
+  order by Annee, Semaine desc
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelSemaineHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Annee      string `json:"Annee"`
+		Semaine    string `json:"Semaine"`
+		Petroliere string `json:"Petroliere"`
+		Ville      string `json:"Ville"`
+		PrixMoyen  string `json:"PrixMoyen"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Annee      sql.NullString
+			Semaine    sql.NullString
+			Petroliere sql.NullString
+			Ville      sql.NullString
+			PrixMoyen  sql.NullString
+		)
+		if err := rows.Scan(
+			&Annee,
+			&Semaine,
+			&Petroliere,
+			&Ville,
+			&PrixMoyen,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelSemaineHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Annee:      Annee.String,
+			Semaine:    Semaine.String,
+			Petroliere: Petroliere.String,
+			Ville:      Ville.String,
+			PrixMoyen:  PrixMoyen.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelSemaineHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelJourHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT [Date]
+      ,[Petroliere]
+      ,[Ville]
+      ,[PrixMoyen]
+  FROM [Fuel].[dbo].[v_PrixFuel_Jour]
+  order by [Date] Desc
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelJourHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date       string `json:"Date"`
+		Petroliere string `json:"Petroliere"`
+		Ville      string `json:"Ville"`
+		PrixMoyen  string `json:"PrixMoyen"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date       sql.NullString
+			Petroliere sql.NullString
+			Ville      sql.NullString
+			PrixMoyen  sql.NullString
+		)
+		if err := rows.Scan(
+			&Date,
+			&Petroliere,
+			&Ville,
+			&PrixMoyen,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelJourHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:       Date.String,
+			Petroliere: Petroliere.String,
+			Ville:      Ville.String,
+			PrixMoyen:  PrixMoyen.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelJourHandler: " + err.Error())
 		return
 	}
 
