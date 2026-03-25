@@ -51,6 +51,7 @@
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab active">Prix Fuel</a>
+    <a href="/villes"   class="tab">Villes</a>
     {{end}}
   </nav>
 </section>
@@ -254,6 +255,11 @@
         }
     }
 
+    
+    function cleanCell(cell) {
+        return (cell === 0 || cell === "0" || cell === null) ? "" : cell;
+    }
+
     //render dataset into table
     async function renderTable(datasetKey){
         await loadDataForView(datasetKey);
@@ -283,6 +289,7 @@
 
                 row.forEach((cell, cellIndex) => {
                     let style = "";
+                    const cleaned = cleanCell(cell)
                     
                     // Only apply color formatting to columns with "Diff" in the header
                     const columnHeader = data.headers[cellIndex] || "";
@@ -295,11 +302,11 @@
                                 style = 'style="color: #00b300; font-weight: bold;"';   // lush green
                             } else if (num < 0) {
                                 style = 'style="color: #cc0000; font-weight: bold;"';   // bold red
-                            }
+                            } 
                         }
                     }
 
-                    rowHTML += `<td ${style}>${cell ?? ""}</td>`;
+                    rowHTML += `<td ${style}>${cleaned ?? ""}</td>`;
                 });
 
                 rowHTML += "</tr>";

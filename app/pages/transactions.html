@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fuel'O'Matic Transactions</title>
+    <title>Fuel'O'Matic - Transactions</title>
     <link rel="stylesheet" href="/assets/style.css">
 
 
@@ -102,6 +102,7 @@ tr.rating-3 {
     <a href="/transactions"  class="tab active">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab">Prix Fuel</a>
+    <a href="/villes"   class="tab">Villes</a>
     {{end}}
   </nav>
 </section>
@@ -229,8 +230,8 @@ tr.rating-3 {
         tr.className = cssClass;
         tr.innerHTML = `
           <td>${r.OilCoName ?? ''}</td>
-          <td>${r.DerniereSynchro ?? ''}</td>
-          <td>${r.DerniereTransaction ?? ''}</td>
+          <td>${r.DerniereSynchro.slice(0,10) ?? ''}</td>
+          <td>${r.DerniereTransaction.slice(0,10) ?? ''}</td>
           <td>${r.JoursDepuisSynchro ?? ''}</td>
           <td>${status}</td>
           `;

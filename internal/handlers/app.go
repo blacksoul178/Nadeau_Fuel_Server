@@ -1,5 +1,7 @@
 package handlers
 
+//Mapping of all the paths to the pages and APIs
+
 import (
 	"Nadeau_Fuel_Server/internal/logger"
 	"database/sql"
@@ -25,6 +27,7 @@ var tplLogs = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pag
 var tplUsers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "users.html")))
 var tplTaux = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "taux.html")))
 var tplPrixFuel = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "prixFuel.html")))
+var tplVilles = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "villes.html")))
 
 var db *sql.DB
 
@@ -49,6 +52,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
 	mux.HandleFunc("/taux", requireLogin(tauxHandler))
 	mux.HandleFunc("/prixFuel", requireLogin(prixFuelHandler))
+	mux.HandleFunc("/villes", requireLogin(villesHandler))
 	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
 	mux.HandleFunc("/admin/logs", requireLogin(logsHandler))
 	mux.HandleFunc("/admin/users", requireLogin(usersHandler))
@@ -71,6 +75,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("GET /api/prixFuel/diffJour", requireLogin(http.HandlerFunc(prixFuelDiffJourHandler)))
 	mux.Handle("GET /api/prixFuel/semaine", requireLogin(http.HandlerFunc(prixFuelSemaineHandler)))
 	mux.Handle("GET /api/prixFuel/jour", requireLogin(http.HandlerFunc(prixFuelJourHandler)))
+	mux.Handle("GET /api/villes/all", requireLogin(http.HandlerFunc(villesAllHandler)))
 
 	//Post API
 	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver)))
@@ -78,12 +83,13 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("POST /api/cartes/add", requireLogin(http.HandlerFunc(cartesAddHandler)))
 	mux.Handle("POST /api/cartes/update", requireLogin(http.HandlerFunc(cartesUpdateHandler)))
 	mux.Handle("POST /api/cartes/delete", requireLogin(http.HandlerFunc(cartesDeleteHandler)))
+	mux.Handle("POST /api/villes/update", requireLogin(http.HandlerFunc(villesUpdateHandler)))
 
 	// local scripts
 	mux.Handle("POST /api/drivers/sync", requireLogin(http.HandlerFunc(syncDriversHandler)))
 	mux.Handle("POST /api/transactions/import", requireLogin(http.HandlerFunc(importTransactionsHandler)))
 
-	//admin
+	//admin APIs
 	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsAllHandler)))
 	mux.Handle("GET /api/admin/logs", requireLogin(http.HandlerFunc(logsApiHandler)))
 	mux.Handle("GET /api/admin/users/all", requireLogin(http.HandlerFunc(usersAllHandler)))

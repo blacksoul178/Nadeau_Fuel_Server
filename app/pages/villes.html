@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel'O'Matic - Villes</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Fuel'O'Matic Nadeau</h1>
+        </div>
+        <div class="user-info">
+            {{.Username}}
+            <span class="role-badge {{.Role}}">{{.Role}}</span>
+        <form action="/logout" method="POST">
+        <!-- CSRF Token for logout -->
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+        <button type="submit" class="logout-btn">Logout</button>
+        </div>
+    </form>
+</header>
+<br>
+
+<section id="content">
+    <h2>Bienvenue {{.Username}}</h2> 
+    {{if .IsAdmin}}
+    <div class="admin-section">
+        <h3>Admin Panel</h3>
+        <p>You have admin access. You can manage:</p>
+            <nav>
+                <a href="/admin">Admin Dashboard</a>
+                <a href="/admin/users">Manage Users</a>
+                <a href="/admin/syncruns">View last syncruns</a>
+                <a href="/admin/logs">View logs</a>
+            </nav>
+        </div>
+        {{end}}
+        <h4>Navigation</h4>
+        
+        <nav class="tabs">
+    <a href="/chauffeurs"    class="tab">Chauffeurs</a>
+    <a href="/cartes"        class="tab">Cartes</a>
+    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    <a href="/vehicules"     class="tab">Véhicules</a>
+    <a href="/taux"   class="tab">Taux</a>
+    {{ if or .IsAdmin .IsSuperUser }}
+    <div class="tab-spacer"></div>
+    <a href="/transactions"  class="tab">Transactions</a>
+    <a href="/petrolieres"   class="tab">Pétrolières</a>
+    <a href="/prixFuel"   class="tab">Prix Fuel</a>
+    <a href="/villes"   class="tab active">Villes</a>
+    {{end}}
+  </nav>
+</section>
+
+
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+        <div>
+            <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Ville, Région">
+            </div>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+      <button id="reset-filters" style="margin-left: 10px; padding: 5px 10px; cursor: pointer;">Réinitialiser filtres</button>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th class="col-200">Ville CSV</th>
+            <th class="col-200">Normalisation</th>
+            <th class="col-200">Région</th>
+            <th class="col-80">MAJ Par</th>
+            <th class="col-120">Dernière MAJ</th>
+            <th class="col-80 nowrap">Controles</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+
+  <script>
+
+const state = { data: [], debounceTimer: null };
+
+// ---------------- CSRF ----------------
+function getCSRF() {
+  const m = document.querySelector('meta[name="csrf-token"]');
+  if (m && m.content) return m.content;
+  const v = document.cookie.split(';')
+      .map(s => s.trim())
+      .find(s => s.startsWith('csrf_token='));
+  return v ? v.split('=')[1] : '';
+}
+
+// ---------------- LOAD DATA ----------------
+async function loadAll() {
+  const res = await fetch('/api/villes/all', {
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+
+  const raw = await res.json();
+
+  state.data = raw.map(r => {
+    const SupplierCity = r.SupplierCity ?? '';
+    const NormalizedCity = r.NormalizedCity ?? '';
+    const Region = r.Region ?? '';
+    const LastUpdatedBy = r.LastUpdatedBy ?? '';
+    const LastUpdatedDate = r.LastUpdatedDate ?? '';
+
+    return {
+      SupplierCity,
+      NormalizedCity,
+      Region,
+      LastUpdatedBy,
+      LastUpdatedDate,
+      _haystack: [
+        SupplierCity,
+        NormalizedCity,
+        Region,
+        LastUpdatedBy,
+        LastUpdatedDate
+      ].join(' ').toLowerCase()
+    };
+  });
+}
+
+// ---------------- FILTER ----------------
+function applyFilter() {
+  const search = (document.getElementById('f-search').value || '')
+    .trim()
+    .toLowerCase();
+
+  try {
+    localStorage.setItem('villes_filter_search', search);
+  } catch {}
+
+  const rows = search
+    ? state.data.filter(r => r._haystack.includes(search))
+    : state.data;
+
+  render(rows);
+}
+
+function debounce(fn, wait = 250) {
+  return (...args) => {
+    clearTimeout(state.debounceTimer);
+    state.debounceTimer = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+// ---------------- RENDER ----------------
+function render(rows) {
+  const tb = document.querySelector('#tbl tbody');
+  tb.innerHTML = '';
+
+  const frag = document.createDocumentFragment();
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.SupplierCity}</td>
+
+      <td class="cell-NormalizedCity"><span class="val">${r.NormalizedCity}</span></td>
+      <td class="cell-Region"><span class="val">${r.Region}</span></td>
+      <td class="cell-LastUpdatedBy"><span class="val">${r.LastUpdatedBy}</span></td>
+      <td class="cell-LastUpdatedDate"><span class="val">${r.LastUpdatedDate.slice(0,10)}</span></td>
+
+
+      <td>
+        <button class="btn-edit"
+          data-city="${encodeURIComponent(r.SupplierCity)}">
+          Modifier
+        </button>
+      </td>
+    `;
+    frag.appendChild(tr);
+  });
+
+  tb.appendChild(frag);
+  document.getElementById('count').textContent =
+    rows.length + (rows.length > 1 ? ' résultats' : ' résultat');
+}
+
+// ---------------- EDIT / SAVE ----------------
+function setupEditing() {
+  const tb = document.querySelector('#tbl tbody');
+
+  tb.addEventListener('click', async e => {
+    const btn = e.target.closest('.btn-edit');
+    if (!btn) return;
+
+    const row = btn.closest('tr');
+    const SupplierCity = decodeURIComponent(btn.dataset.city);
+
+    const normCell = row.querySelector('.cell-NormalizedCity');
+    const regionCell = row.querySelector('.cell-Region');
+    const updatedByVal = row.querySelector('.cell-LastUpdatedBy .val');
+    const updatedDateVal = row.querySelector('.cell-LastUpdatedDate .val');
+
+    const currentUser = "{{.Username}}";
+    const isEditing = btn.dataset.editing === '1';
+
+    if (!isEditing) {
+      const nVal = normCell.querySelector('.val').textContent.trim();
+      const rVal = regionCell.querySelector('.val').textContent.trim();
+
+      normCell.innerHTML =
+        `<input class="inp-NormalizedCity" value="${nVal}">`;
+      const regions = [
+        'bas-saint-laurent',
+        'saguenay-lac-saint-jean',
+        'capitale-nationale',
+        'mauricie',
+        'estrie',
+        'montreal',
+        'outaouais',
+        'abitibi-temiscamingue',
+        'cote-nord',
+        'nord-du-quebec',
+        'gaspesie-iles-de-la-madeleine',
+        'chaudiere-appalaches',
+        'laval',
+        'lanaudiere',
+        'laurentides',
+        'monteregie',
+        'centre-du-quebec'
+        ];
+
+    regionCell.innerHTML = `
+    <select class="inp-Region">
+        <option value="">— sélectionner —</option>
+        ${regions.map(reg => `
+        <option value="${reg}" ${reg === rVal ? 'selected' : ''}>
+            ${reg}
+        </option>
+        `).join('')}
+    </select>
+    `;
+
+      btn.textContent = 'Sauvegarder';
+      btn.dataset.editing = '1';
+      return;
+    }
+
+    // -------- SAVE --------
+    const NormalizedCity =
+      row.querySelector('.inp-NormalizedCity')?.value.trim() || null;
+
+    const Region =
+      row.querySelector('.inp-Region')?.value.trim() || null;
+
+    try {
+      const res = await fetch('/api/villes/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCSRF()
+        },
+        body: JSON.stringify({
+          SupplierCity,
+          NormalizedCity,
+          Region
+        })
+      });
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || res.statusText);
+      }
+
+      // ✅ optimistic UI update
+      normCell.innerHTML = `<span class="val">${NormalizedCity ?? ''}</span>`;
+      regionCell.innerHTML = `<span class="val">${Region ?? ''}</span>`;
+
+      if (updatedByVal) {
+        updatedByVal.textContent = currentUser;
+      }
+
+      if (updatedDateVal) {
+        const now = new Date();
+        const formatted =
+          now.getFullYear() + '-' +
+          String(now.getMonth() + 1).padStart(2, '0') + '-' +
+          String(now.getDate()).padStart(2, '0') + ' ' +
+          String(now.getHours()).padStart(2, '0') + ':' +
+          String(now.getMinutes()).padStart(2, '0');
+
+        updatedDateVal.textContent = formatted;
+      }
+
+      btn.textContent = 'Modifier';
+      btn.dataset.editing = '0';
+    } catch (err) {
+      alert('Erreur sauvegarde : ' + err.message);
+    }
+  });
+}
+
+// ---------------- INIT ----------------
+(async function init() {
+  try {
+    await loadAll();
+
+    try {
+      const saved = localStorage.getItem('villes_filter_search');
+      if (saved !== null) document.getElementById('f-search').value = saved;
+    } catch {}
+
+    applyFilter();
+    setupEditing();
+
+    document.getElementById('f-search')
+      .addEventListener('input', debounce(applyFilter));
+
+    document.getElementById('reset-filters')
+      .addEventListener('click', () => {
+        localStorage.removeItem('villes_filter_search');
+        document.getElementById('f-search').value = '';
+        applyFilter();
+      });
+
+  } catch (e) {
+    alert('Erreur chargement: ' + e.message);
+  }
+})();
+
+  </script>
+</body>
+</html>

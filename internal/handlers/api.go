@@ -1,5 +1,6 @@
 package handlers
 
+// All API Handlers
 import (
 	"Nadeau_Fuel_Server/internal/logger"
 	"context"
@@ -182,6 +183,73 @@ func logsApiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = json.NewEncoder(w).Encode(lines)
+}
+func usersAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	query := `SELECT id, SiteUser, IsAdmin, IsSuperUser FROM dbo.SiteUser ORDER BY SiteUser`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		logger.Info("Query error on usersAllHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+	defer rows.Close()
+
+	type userOut struct {
+		Id          int    `json:"id"`
+		SiteUser    string `json:"SiteUser"`
+		IsAdmin     bool   `json:"IsAdmin"`
+		IsSuperUser bool   `json:"IsSuperUser"`
+	}
+
+	out := make([]userOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			id          sql.NullInt32
+			siteUser    sql.NullString
+			isAdmin     sql.NullBool
+			isSuperUser sql.NullBool
+		)
+		if err := rows.Scan(&id, &siteUser, &isAdmin, &isSuperUser); err != nil {
+			logger.Info("Scan error on usersAllHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "Scan error")
+			return
+		}
+
+		out = append(out, userOut{
+			Id:          int(id.Int32),
+			SiteUser:    siteUser.String,
+			IsAdmin:     isAdmin.Bool,
+			IsSuperUser: isSuperUser.Bool,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.Info("Rows error on usersAllHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Rows error")
+		return
+	}
+
+	if out == nil {
+		out = []userOut{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
 }
 
 // GETs fetch data
@@ -775,11 +843,11 @@ func prixFuelGlobalSemaineHandler(w http.ResponseWriter, r *http.Request) {
 SELECT [Annee]
       ,[Semaine]
       ,[Prix_Harnois]
-      ,[Diff_Esso]
-      ,[Diff_Petro]
-      ,[Diff_Ultramar]
-      ,[Diff_Irving]
-      ,[Diff_Belisle]
+      ,[Diff_Esso] * 100
+      ,[Diff_Petro] * 100
+      ,[Diff_Ultramar] * 100
+      ,[Diff_Irving] * 100
+      ,[Diff_Belisle] * 100
   FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalSemaine]
   order by Annee, Semaine desc
 `
@@ -793,14 +861,14 @@ SELECT [Annee]
 	defer rows.Close()
 
 	type rowOut struct {
-		Annee         string `json:"Annee"`
-		Semaine       string `json:"Semaine"`
-		Prix_Harnois  string `json:"Prix_Harnois"`
-		Diff_Esso     string `json:"Diff_Esso"`
-		Diff_Petro    string `json:"Diff_Petro"`
-		Diff_Ultramar string `json:"Diff_Ultramar"`
-		Diff_Irving   string `json:"Diff_Irving"`
-		Diff_Belisle  string `json:"Diff_Belisle"`
+		Annee         string  `json:"Annee"`
+		Semaine       string  `json:"Semaine"`
+		Prix_Harnois  string  `json:"Prix_Harnois"`
+		Diff_Esso     float64 `json:"Diff_Esso"`
+		Diff_Petro    float64 `json:"Diff_Petro"`
+		Diff_Ultramar float64 `json:"Diff_Ultramar"`
+		Diff_Irving   float64 `json:"Diff_Irving"`
+		Diff_Belisle  float64 `json:"Diff_Belisle"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -809,11 +877,11 @@ SELECT [Annee]
 			Annee         sql.NullString
 			Semaine       sql.NullString
 			Prix_Harnois  sql.NullString
-			Diff_Esso     sql.NullString
-			Diff_Petro    sql.NullString
-			Diff_Ultramar sql.NullString
-			Diff_Irving   sql.NullString
-			Diff_Belisle  sql.NullString
+			Diff_Esso     sql.NullFloat64
+			Diff_Petro    sql.NullFloat64
+			Diff_Ultramar sql.NullFloat64
+			Diff_Irving   sql.NullFloat64
+			Diff_Belisle  sql.NullFloat64
 		)
 		if err := rows.Scan(
 			&Annee,
@@ -834,11 +902,11 @@ SELECT [Annee]
 			Annee:         Annee.String,
 			Semaine:       Semaine.String,
 			Prix_Harnois:  Prix_Harnois.String,
-			Diff_Esso:     Diff_Esso.String,
-			Diff_Petro:    Diff_Petro.String,
-			Diff_Ultramar: Diff_Ultramar.String,
-			Diff_Irving:   Diff_Irving.String,
-			Diff_Belisle:  Diff_Belisle.String,
+			Diff_Esso:     Diff_Esso.Float64,
+			Diff_Petro:    Diff_Petro.Float64,
+			Diff_Ultramar: Diff_Ultramar.Float64,
+			Diff_Irving:   Diff_Irving.Float64,
+			Diff_Belisle:  Diff_Belisle.Float64,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -863,11 +931,11 @@ func prixFuelGlobalJourHandler(w http.ResponseWriter, r *http.Request) {
 	query := `
 SELECT TOP (365) [Date]
       ,[Prix_Harnois]
-      ,[Diff_Esso]
-      ,[Diff_Petro]
-      ,[Diff_Ultramar]
-      ,[Diff_Irving]
-      ,[Diff_Belisle]
+      ,[Diff_Esso] *100
+      ,[Diff_Petro] *100
+      ,[Diff_Ultramar] *100
+      ,[Diff_Irving] *100
+      ,[Diff_Belisle] *100
   FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalJour]
   order by [Date] desc
 `
@@ -881,13 +949,13 @@ SELECT TOP (365) [Date]
 	defer rows.Close()
 
 	type rowOut struct {
-		Date          string `json:"Date"`
-		Prix_Harnois  string `json:"Prix_Harnois"`
-		Diff_Esso     string `json:"Diff_Esso"`
-		Diff_Petro    string `json:"Diff_Petro"`
-		Diff_Ultramar string `json:"Diff_Ultramar"`
-		Diff_Irving   string `json:"Diff_Irving"`
-		Diff_Belisle  string `json:"Diff_Belisle"`
+		Date          string  `json:"Date"`
+		Prix_Harnois  string  `json:"Prix_Harnois"`
+		Diff_Esso     float64 `json:"Diff_Esso"`
+		Diff_Petro    float64 `json:"Diff_Petro"`
+		Diff_Ultramar float64 `json:"Diff_Ultramar"`
+		Diff_Irving   float64 `json:"Diff_Irving"`
+		Diff_Belisle  float64 `json:"Diff_Belisle"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -895,11 +963,11 @@ SELECT TOP (365) [Date]
 		var (
 			Date          sql.NullString
 			Prix_Harnois  sql.NullString
-			Diff_Esso     sql.NullString
-			Diff_Petro    sql.NullString
-			Diff_Ultramar sql.NullString
-			Diff_Irving   sql.NullString
-			Diff_Belisle  sql.NullString
+			Diff_Esso     sql.NullFloat64
+			Diff_Petro    sql.NullFloat64
+			Diff_Ultramar sql.NullFloat64
+			Diff_Irving   sql.NullFloat64
+			Diff_Belisle  sql.NullFloat64
 		)
 		if err := rows.Scan(
 			&Date,
@@ -918,11 +986,11 @@ SELECT TOP (365) [Date]
 		out = append(out, rowOut{
 			Date:          Date.String,
 			Prix_Harnois:  Prix_Harnois.String,
-			Diff_Esso:     Diff_Esso.String,
-			Diff_Petro:    Diff_Petro.String,
-			Diff_Ultramar: Diff_Ultramar.String,
-			Diff_Irving:   Diff_Irving.String,
-			Diff_Belisle:  Diff_Belisle.String,
+			Diff_Esso:     Diff_Esso.Float64,
+			Diff_Petro:    Diff_Petro.Float64,
+			Diff_Ultramar: Diff_Ultramar.Float64,
+			Diff_Irving:   Diff_Irving.Float64,
+			Diff_Belisle:  Diff_Belisle.Float64,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -949,11 +1017,11 @@ SELECT TOP (52) [Annee]
       ,[Semaine]
       ,[Ville]
       ,[Prix_Harnois]
-      ,[Diff_Esso]
-      ,[Diff_Petro]
-      ,[Diff_Ultramar]
-      ,[Diff_Irving]
-      ,[Diff_Belisle]
+      ,[Diff_Esso] *100
+      ,[Diff_Petro] *100
+      ,[Diff_Ultramar] *100
+      ,[Diff_Irving] *100
+      ,[Diff_Belisle] *100
   FROM [Fuel].[dbo].[v_PrixFuel_Diff_semaine]
   order by Annee, Semaine desc
 
@@ -968,15 +1036,15 @@ SELECT TOP (52) [Annee]
 	defer rows.Close()
 
 	type rowOut struct {
-		Annee         string `json:"Annee"`
-		Semaine       string `json:"Semaine"`
-		Ville         string `json:"Ville"`
-		Prix_Harnois  string `json:"Prix_Harnois"`
-		Diff_Esso     string `json:"Diff_Esso"`
-		Diff_Petro    string `json:"Diff_Petro"`
-		Diff_Ultramar string `json:"Diff_Ultramar"`
-		Diff_Irving   string `json:"Diff_Irving"`
-		Diff_Belisle  string `json:"Diff_Belisle"`
+		Annee         string  `json:"Annee"`
+		Semaine       string  `json:"Semaine"`
+		Ville         string  `json:"Ville"`
+		Prix_Harnois  string  `json:"Prix_Harnois"`
+		Diff_Esso     float64 `json:"Diff_Esso"`
+		Diff_Petro    float64 `json:"Diff_Petro"`
+		Diff_Ultramar float64 `json:"Diff_Ultramar"`
+		Diff_Irving   float64 `json:"Diff_Irving"`
+		Diff_Belisle  float64 `json:"Diff_Belisle"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -986,11 +1054,11 @@ SELECT TOP (52) [Annee]
 			Semaine       sql.NullString
 			Ville         sql.NullString
 			Prix_Harnois  sql.NullString
-			Diff_Esso     sql.NullString
-			Diff_Petro    sql.NullString
-			Diff_Ultramar sql.NullString
-			Diff_Irving   sql.NullString
-			Diff_Belisle  sql.NullString
+			Diff_Esso     sql.NullFloat64
+			Diff_Petro    sql.NullFloat64
+			Diff_Ultramar sql.NullFloat64
+			Diff_Irving   sql.NullFloat64
+			Diff_Belisle  sql.NullFloat64
 		)
 		if err := rows.Scan(
 			&Annee,
@@ -1013,11 +1081,11 @@ SELECT TOP (52) [Annee]
 			Semaine:       Semaine.String,
 			Ville:         Ville.String,
 			Prix_Harnois:  Prix_Harnois.String,
-			Diff_Esso:     Diff_Esso.String,
-			Diff_Petro:    Diff_Petro.String,
-			Diff_Ultramar: Diff_Ultramar.String,
-			Diff_Irving:   Diff_Irving.String,
-			Diff_Belisle:  Diff_Belisle.String,
+			Diff_Esso:     Diff_Esso.Float64,
+			Diff_Petro:    Diff_Petro.Float64,
+			Diff_Ultramar: Diff_Ultramar.Float64,
+			Diff_Irving:   Diff_Irving.Float64,
+			Diff_Belisle:  Diff_Belisle.Float64,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -1043,11 +1111,11 @@ func prixFuelDiffJourHandler(w http.ResponseWriter, r *http.Request) {
 SELECT [Date]
       ,[Ville]
       ,[Prix_Harnois]
-      ,[Diff_Esso]
-      ,[Diff_Petro]
-      ,[Diff_Ultramar]
-      ,[Diff_Irving]
-      ,[Diff_Belisle]
+      ,[Diff_Esso] * 100
+      ,[Diff_Petro] * 100
+      ,[Diff_Ultramar] * 100
+      ,[Diff_Irving] * 100
+      ,[Diff_Belisle] * 100
   FROM [Fuel].[dbo].[v_PrixFuel_Diff_Jour]
   Order by [date] desc
 `
@@ -1061,14 +1129,14 @@ SELECT [Date]
 	defer rows.Close()
 
 	type rowOut struct {
-		Date          string `json:"Date"`
-		Ville         string `json:"Ville"`
-		Prix_Harnois  string `json:"Prix_Harnois"`
-		Diff_Esso     string `json:"Diff_Esso"`
-		Diff_Petro    string `json:"Diff_Petro"`
-		Diff_Ultramar string `json:"Diff_Ultramar"`
-		Diff_Irving   string `json:"Diff_Irving"`
-		Diff_Belisle  string `json:"Diff_Belisle"`
+		Date          string  `json:"Date"`
+		Ville         string  `json:"Ville"`
+		Prix_Harnois  string  `json:"Prix_Harnois"`
+		Diff_Esso     float64 `json:"Diff_Esso"`
+		Diff_Petro    float64 `json:"Diff_Petro"`
+		Diff_Ultramar float64 `json:"Diff_Ultramar"`
+		Diff_Irving   float64 `json:"Diff_Irving"`
+		Diff_Belisle  float64 `json:"Diff_Belisle"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -1077,11 +1145,11 @@ SELECT [Date]
 			Date          sql.NullString
 			Ville         sql.NullString
 			Prix_Harnois  sql.NullString
-			Diff_Esso     sql.NullString
-			Diff_Petro    sql.NullString
-			Diff_Ultramar sql.NullString
-			Diff_Irving   sql.NullString
-			Diff_Belisle  sql.NullString
+			Diff_Esso     sql.NullFloat64
+			Diff_Petro    sql.NullFloat64
+			Diff_Ultramar sql.NullFloat64
+			Diff_Irving   sql.NullFloat64
+			Diff_Belisle  sql.NullFloat64
 		)
 		if err := rows.Scan(
 			&Date,
@@ -1102,11 +1170,11 @@ SELECT [Date]
 			Date:          Date.String,
 			Ville:         Ville.String,
 			Prix_Harnois:  Prix_Harnois.String,
-			Diff_Esso:     Diff_Esso.String,
-			Diff_Petro:    Diff_Petro.String,
-			Diff_Ultramar: Diff_Ultramar.String,
-			Diff_Irving:   Diff_Irving.String,
-			Diff_Belisle:  Diff_Belisle.String,
+			Diff_Esso:     Diff_Esso.Float64,
+			Diff_Petro:    Diff_Petro.Float64,
+			Diff_Ultramar: Diff_Ultramar.Float64,
+			Diff_Irving:   Diff_Irving.Float64,
+			Diff_Belisle:  Diff_Belisle.Float64,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -1255,6 +1323,151 @@ SELECT [Date]
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
 		logger.Info("Rows error on PrixFuelJourHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	query := `
+	SELECT
+		OilCoName,
+		DerniereSynchro,
+		DerniereTransaction,
+		JoursDepuisSynchro
+	FROM Fuel.dbo.DerniereSynchroComplete
+	ORDER BY OilCoName ASC
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		logger.Info("Query error on syncStatusHandler: " + err.Error())
+		http.Error(w, "query error: "+err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+
+	type SyncStatus struct {
+		OilCoName           string `json:"OilCoName"`
+		DerniereSynchro     string `json:"DerniereSynchro"`
+		DerniereTransaction string `json:"DerniereTransaction"`
+		JoursDepuisSynchro  int    `json:"JoursDepuisSynchro"`
+	}
+	out := make([]SyncStatus, 0, 256)
+
+	for rows.Next() {
+		var (
+			oilCoName           sql.NullString
+			derniereSynchro     sql.NullTime
+			derniereTransaction sql.NullTime
+			joursDepuisSynchro  sql.NullInt64
+		)
+		if err := rows.Scan(&oilCoName, &derniereSynchro, &derniereTransaction, &joursDepuisSynchro); err != nil {
+			logger.Info("Scan error on syncStatusHandler: " + err.Error())
+			http.Error(w, "scan error: "+err.Error(), 500)
+			return
+		}
+
+		syncStatus := SyncStatus{
+			OilCoName: oilCoName.String,
+		}
+
+		if derniereSynchro.Valid {
+			syncStatus.DerniereSynchro = derniereSynchro.Time.Format("2006-01-02T15:04:05")
+		}
+
+		if derniereTransaction.Valid {
+			syncStatus.DerniereTransaction = derniereTransaction.Time.Format("2006-01-02T15:04:05")
+		}
+
+		if joursDepuisSynchro.Valid {
+			syncStatus.JoursDepuisSynchro = int(joursDepuisSynchro.Int64)
+		}
+
+		out = append(out, syncStatus)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.Info("Rows error on syncStatusHandler: " + err.Error())
+		http.Error(w, "rows error: "+err.Error(), 500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+func villesAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+	SELECT 
+	SupplierCity, NormalizedCity, Region,
+	LastUpdatedBy, LastUpdatedDate
+	FROM Fuel.dbo.CityNormalization
+	ORDER BY
+    CASE WHEN NormalizedCity IS NULL THEN 0 ELSE 1 END,  -- NULLs first
+    LastUpdatedDate DESC;
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on villesAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		SupplierCity    string `json:"SupplierCity"`
+		NormalizedCity  string `json:"NormalizedCity"`
+		Region          string `json:"Region"`
+		LastUpdatedBy   string `json:"LastUpdatedBy"`
+		LastUpdatedDate string `json:"LastUpdatedDate"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			SupplierCity    sql.NullString
+			NormalizedCity  sql.NullString
+			Region          sql.NullString
+			LastUpdatedBy   sql.NullString
+			LastUpdatedDate sql.NullString
+		)
+		if err := rows.Scan(&SupplierCity, &NormalizedCity, &Region, &LastUpdatedBy, &LastUpdatedDate); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on villesAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			SupplierCity:    SupplierCity.String,
+			NormalizedCity:  NormalizedCity.String,
+			Region:          Region.String,
+			LastUpdatedBy:   LastUpdatedBy.String,
+			LastUpdatedDate: LastUpdatedDate.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on brokersAllHandler: " + err.Error())
 		return
 	}
 
@@ -1627,6 +1840,11 @@ WHERE CardId = @cid;
 func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) || !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -2083,81 +2301,427 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, http.StatusOK, res)
 }
-
-// Sync status handler - returns data from DerniereSynchroComplete view
-func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+func usersCreateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
+	session := GetSessionInfo(r)
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	type reqBody struct {
+		Username    string `json:"username"`
+		Password    string `json:"password"`
+		IsAdmin     bool   `json:"isAdmin"`
+		IsSuperUser bool   `json:"isSuperUser"`
+	}
+
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	username := strings.ToLower(strings.TrimSpace(body.Username))
+	password := strings.TrimSpace(body.Password)
+
+	if username == "" || password == "" {
+		respondWithError(w, http.StatusBadRequest, "Username and password are required")
+		return
+	}
+
+	// Hash password with bcrypt
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		logger.Info("Bcrypt error on usersCreateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Password hashing error")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	query := `
-	SELECT
-		OilCoName,
-		DerniereSynchro,
-		DerniereTransaction,
-		JoursDepuisSynchro
-	FROM Fuel.dbo.DerniereSynchroComplete
-	ORDER BY OilCoName ASC
-	`
+	insertQ := `INSERT INTO dbo.SiteUser (SiteUser, password_hash, IsAdmin, IsSuperUser) VALUES (@username, @hash, @isAdmin, @isSuperUser)`
 
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		logger.Info("Query error on syncStatusHandler: " + err.Error())
-		http.Error(w, "query error: "+err.Error(), 500)
+	if _, err := db.ExecContext(ctx, insertQ,
+		sql.Named("username", username),
+		sql.Named("hash", string(hash)),
+		sql.Named("isAdmin", body.IsAdmin),
+		sql.Named("isSuperUser", body.IsSuperUser),
+	); err != nil {
+		logger.Info("Insert error on usersCreateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
-	defer rows.Close()
 
-	type SyncStatus struct {
-		OilCoName           string `json:"OilCoName"`
-		DerniereSynchro     string `json:"DerniereSynchro"`
-		DerniereTransaction string `json:"DerniereTransaction"`
-		JoursDepuisSynchro  int    `json:"JoursDepuisSynchro"`
+	logger.Info(fmt.Sprintf("User %s created by %s", username, session.Username))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
-	out := make([]SyncStatus, 0, 256)
 
-	for rows.Next() {
-		var (
-			oilCoName           sql.NullString
-			derniereSynchro     sql.NullTime
-			derniereTransaction sql.NullTime
-			joursDepuisSynchro  sql.NullInt64
-		)
-		if err := rows.Scan(&oilCoName, &derniereSynchro, &derniereTransaction, &joursDepuisSynchro); err != nil {
-			logger.Info("Scan error on syncStatusHandler: " + err.Error())
-			http.Error(w, "scan error: "+err.Error(), 500)
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
+	session := GetSessionInfo(r)
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	type reqBody struct {
+		ID int `json:"id"`
+	}
+
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if body.ID <= 0 {
+		respondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Prevent deleting current user
+	var targetUsername string
+	err = db.QueryRowContext(ctx, "SELECT SiteUser FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.ID)).Scan(&targetUsername)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusNotFound, "User not found")
+		} else {
+			logger.Info("Query error on usersDeleteHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "Database error")
+		}
+		return
+	}
+
+	if strings.EqualFold(targetUsername, session.Username) {
+		respondWithError(w, http.StatusForbidden, "Cannot delete your own user account")
+		return
+	}
+
+	// Prevent deleting last admin user
+	var adminCount int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dbo.SiteUser WHERE IsAdmin = 1").Scan(&adminCount)
+	if err != nil {
+		logger.Info("Count error on usersDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	var targetIsAdmin bool
+	err = db.QueryRowContext(ctx, "SELECT IsAdmin FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.ID)).Scan(&targetIsAdmin)
+	if err != nil {
+		logger.Info("Admin check error on usersDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	if targetIsAdmin && adminCount <= 1 {
+		respondWithError(w, http.StatusForbidden, "Cannot delete the last admin user")
+		return
+	}
+
+	deleteQ := `DELETE FROM dbo.SiteUser WHERE id = @id`
+
+	result, err := db.ExecContext(ctx, deleteQ, sql.Named("id", body.ID))
+	if err != nil {
+		logger.Info("Delete error on usersDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		logger.Info("RowsAffected error on usersDeleteHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	if rowsAffected == 0 {
+		respondWithError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	logger.Info(fmt.Sprintf("User ID %d deleted by %s", body.ID, session.Username))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func usersChangePasswordForUserHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
+	session := GetSessionInfo(r)
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	type reqBody struct {
+		UserID      int    `json:"userId"`
+		NewPassword string `json:"newPassword"`
+	}
+
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if body.UserID <= 0 {
+		respondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	newPassword := strings.TrimSpace(body.NewPassword)
+	if newPassword == "" {
+		respondWithError(w, http.StatusBadRequest, "New password is required")
+		return
+	}
+
+	// Prevent admin from changing their own password via this endpoint
+	var targetUsername string
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	err = db.QueryRowContext(ctx, "SELECT SiteUser FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.UserID)).Scan(&targetUsername)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusNotFound, "User not found")
+		} else {
+			logger.Info("Query error on usersChangePasswordForUserHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "Database error")
+		}
+		return
+	}
+
+	if strings.EqualFold(targetUsername, session.Username) {
+		respondWithError(w, http.StatusForbidden, "Use the regular change password endpoint for your own password")
+		return
+	}
+
+	// Hash new password
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		logger.Info("Bcrypt error on usersChangePasswordForUserHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Password hashing error")
+		return
+	}
+
+	// Update password
+	updateQ := `UPDATE dbo.SiteUser SET password_hash = @hash WHERE id = @id`
+	if _, err := db.ExecContext(ctx, updateQ,
+		sql.Named("hash", string(newHash)),
+		sql.Named("id", body.UserID),
+	); err != nil {
+		logger.Info("Update error on usersChangePasswordForUserHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Password changed for user ID %d by %s", body.UserID, session.Username))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
+	session := GetSessionInfo(r)
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	type reqBody struct {
+		UserID      int    `json:"userId"`
+		NewPassword string `json:"newPassword"`
+		IsAdmin     bool   `json:"isAdmin"`
+		IsSuperUser bool   `json:"isSuperUser"`
+	}
+
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if body.UserID <= 0 {
+		respondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Get target user info
+	var targetUsername string
+	var targetIsAdmin bool
+	err = db.QueryRowContext(ctx, "SELECT SiteUser, IsAdmin FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.UserID)).Scan(&targetUsername, &targetIsAdmin)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusNotFound, "User not found")
+		} else {
+			logger.Info("Query error on usersUpdateHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "Database error")
+		}
+		return
+	}
+
+	// Check if trying to remove admin status from last admin
+	if targetIsAdmin && !body.IsAdmin {
+		var adminCount int
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dbo.SiteUser WHERE IsAdmin = 1").Scan(&adminCount)
+		if err != nil {
+			logger.Info("Count error on usersUpdateHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "Database error")
 			return
 		}
 
-		syncStatus := SyncStatus{
-			OilCoName: oilCoName.String,
+		if adminCount <= 1 {
+			respondWithError(w, http.StatusForbidden, "Cannot remove admin status from the last admin user")
+			return
 		}
-
-		if derniereSynchro.Valid {
-			syncStatus.DerniereSynchro = derniereSynchro.Time.Format("2006-01-02T15:04:05")
-		}
-
-		if derniereTransaction.Valid {
-			syncStatus.DerniereTransaction = derniereTransaction.Time.Format("2006-01-02T15:04:05")
-		}
-
-		if joursDepuisSynchro.Valid {
-			syncStatus.JoursDepuisSynchro = int(joursDepuisSynchro.Int64)
-		}
-
-		out = append(out, syncStatus)
 	}
 
-	if err := rows.Err(); err != nil {
-		logger.Info("Rows error on syncStatusHandler: " + err.Error())
-		http.Error(w, "rows error: "+err.Error(), 500)
+	// Build update query
+	var updateQ string
+	var args []interface{}
+
+	if strings.TrimSpace(body.NewPassword) != "" {
+		// Hash new password
+		newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			logger.Info("Bcrypt error on usersUpdateHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "Password hashing error")
+			return
+		}
+
+		updateQ = `UPDATE dbo.SiteUser SET password_hash = @hash, IsAdmin = @isAdmin, IsSuperUser = @isSuperUser WHERE id = @id`
+		args = append(args,
+			sql.Named("hash", string(newHash)),
+			sql.Named("isAdmin", body.IsAdmin),
+			sql.Named("isSuperUser", body.IsSuperUser),
+			sql.Named("id", body.UserID),
+		)
+	} else {
+		updateQ = `UPDATE dbo.SiteUser SET IsAdmin = @isAdmin, IsSuperUser = @isSuperUser WHERE id = @id`
+		args = append(args,
+			sql.Named("isAdmin", body.IsAdmin),
+			sql.Named("isSuperUser", body.IsSuperUser),
+			sql.Named("id", body.UserID),
+		)
+	}
+
+	if _, err := db.ExecContext(ctx, updateQ, args...); err != nil {
+		logger.Info("Update error on usersUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	logger.Info(fmt.Sprintf("User ID %d updated by %s", body.UserID, session.Username))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func villesUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
+	session := GetSessionInfo(r)
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	type reqBody struct {
+		SupplierCity   string `json:"SupplierCity"`
+		NormalizedCity string `json:"NormalizedCity"`
+		Region         string `json:"Region"`
+	}
+
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	SupplierCity := strings.TrimSpace(body.SupplierCity)
+	NormalizedCity := strings.ToLower(strings.TrimSpace(body.NormalizedCity))
+	Region := strings.ToLower(strings.TrimSpace(body.Region))
+	LastUpdateBy := session.Username
+	LastUpdateDate := time.Now().Local()
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	updateQ := `UPDATE Fuel.dbo.CityNormalization 
+	SET 
+	NormalizedCity = @NormalizedCity,
+	Region = @Region,
+	LastUpdatedBy = @LastUpdatedBy,
+	LastUpdatedDate = @LastUpdatedDate
+	where SupplierCity = @SupplierCity
+	`
+
+	if _, err := db.ExecContext(ctx, updateQ,
+		sql.Named("SupplierCity", SupplierCity),
+		sql.Named("NormalizedCity", NormalizedCity),
+		sql.Named("Region", Region),
+		sql.Named("LastUpdatedBy", LastUpdateBy),
+		sql.Named("LastUpdatedDate", LastUpdateDate),
+	); err != nil {
+		logger.Info("Insert error on villesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	logger.Info(fmt.Sprintf("User: %s updated Ville %s to Normalized %s", LastUpdateBy, SupplierCity, NormalizedCity))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
