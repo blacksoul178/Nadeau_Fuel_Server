@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{.CSRFToken}}">
+    <title>Fuel'O'Matic - Chauffeurs</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Fuel'O'Matic Nadeau</h1>
+        </div>
+        <div class="user-info">
+            {{.Username}}
+            <span class="role-badge {{.Role}}">{{.Role}}</span>
+        <form action="/logout" method="POST">
+        <!-- CSRF Token for logout -->
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+        <button type="submit" class="logout-btn">Logout</button>
+      </div>
+    </form>
+  </header>
+</body>
+<br>
+    
+<section id="content">
+  <h2>Bienvenue {{.Username}}</h2> 
+  {{if .IsAdmin}}
+  <div class="admin-section">
+    <h3>Admin Panel</h3>
+    <p>You have admin access. You can manage:</p>
+    <nav>
+      <a href="/admin">Admin Dashboard</a>
+      <a href="/admin/users">Manage Users</a>
+      <a href="/admin/syncruns">View last syncruns</a>
+      <a href="/admin/logs">View logs</a>
+    </nav>
+  </div>
+  {{end}}
+  <h4>Navigation</h4>
+        
+ <nav class="tabs">
+    <a href="/chauffeurs"    class="tab">Chauffeurs</a>
+    <a href="/cartes"        class="tab">Cartes</a>
+    <a href="/brokers"       class="tab">Compagnies Broker</a>
+    <a href="/vehicules"     class="tab">Véhicules</a>
+    <a href="/taux"   class="tab">Taux</a>
+      <a href="/petitsVehicules"   class="tab active">Petits Véhicules</a>
+    {{ if or .IsAdmin .IsSuperUser }}
+    <div class="tab-spacer"></div>
+    <a href="/transactions"  class="tab">Transactions</a>
+    <a href="/petrolieres"   class="tab">Pétrolières</a>
+    <a href="/prixFuel"   class="tab">Prix Fuel</a>
+    <a href="/villes"   class="tab">Villes</a>
+    <a href="/rampe"   class="tab">Prix à la rampe</a>
+    {{end}}
+  </nav>
+</section>
+
+
+  <img class="wtf" src="/../assets/WTF.gif" alt="WIP" />
+
+<!-- <main class="container">
+     Ajout de chauffeur de petit véhicules 
+    <section class="panel">
+          <label for="Ajout Chauffeur">Ajout Chauffeur de petits véhicules: 
+            <br><span style="font-weight: bold; color: red;">NE PAS CRÉER DE CHAUFFEURS QUI ONT UN ISAAC</span></label>
+          <div>
+            <label for="nom">Nom</label>
+            <input type="text" name="nom" id="nom">
+            </select>
+            <br>
+            <label for="Compagnie facturable">Compagnie facturable</label>
+            <select name="Compagnie Facturable" id="dispatchGroup">
+              <option value="1">TGN</option>
+              <option value="2">TMC</option>
+              <option value="5">GJF</option>
+              <option value="4">MTA</option>
+            </select>
+            </div>
+            <div>
+            <label for="Date de début">Date de début</label>
+          <input type="date" name="dateDeDépart" id="startDate">
+          </div>
+          <div>
+            <label for="isBroker">
+              <input type="checkbox" name="isBroker" id="isBroker">
+              Broker
+            </label>
+          </div>
+          <button type="submit" class="AjouterChauffeur">Ajouter</button>
+    </section>
+  </main>
+
+<main class="container">
+     Filters 
+    <section class="panel">
+        <div>
+            <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Nom">
+            </div>
+                <div>
+      <label for="f-actif">Actif?</label>
+      <select id="f-actif">
+        <option value="true">Oui</option>
+        <option value="false">Non</option>
+          <option value="">Tous</option>
+      </select>
+      </div>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+      <button id="reset-filters" style="margin-left: 10px; padding: 5px 10px; cursor: pointer;">Réinitialiser filtres</button>
+    </section> -->
+
+  
+    
+    <!-- Table
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th class="col-120">Nom</th>
+            <th class="col-80">Groupe</th>
+            <th class="col-120">Date de début</th>
+            <th class="col-120">Date de fin</th>
+            <th class="col-120">Broker?</th>
+            <th class="col-80 nowrap">Controles</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+</main>
+
+<script>
+ const state = { data: [] };
+
+    // Map dispatch group numbers to names
+    const dispatchGroupMap = {
+      '1': 'TGN',
+      '2': 'TMC',
+      '5': 'GJF',
+      '4': 'MTA'
+    };
+
+    function getDispatchGroupName(id) {
+      return dispatchGroupMap[String(id)] || id;
+    }
+    function isBroker(IsBroker){
+      if (IsBroker === "true") return "Oui" 
+      else return "Non"
+    }
+
+    function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
+      if (typeof v === 'boolean') return v;
+      if (v == null) return null;
+      const s = String(v).trim().toLowerCase();
+      if (['true', '1', 'oui', 'yes'].includes(s)) return true;
+      if (['false', '0', 'non', 'no'].includes(s)) return false;
+      return null; // inconnu
+    }
+
+
+async function loadAll() {
+      const res = await fetch('/api/petitsVehicules/all', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      state.data = await res.json();
+    }
+
+    // Apply client-side filter
+    function applyFilter() {
+      const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+      const actif = parseBoolLoose((document.getElementById('f-actif').value || ''));
+      
+      try {
+          localStorage.setItem('petitsVehicules_filter_search', document.getElementById('f-search').value || '');
+          localStorage.setItem('petitsVehicules_filter_actif', document.getElementById('f-actif').value || '');
+        } catch (e) {
+          // localStorage might be disabled
+        }
+
+      let rows = state.data;
+      if (search) rows = rows.filter(r => (r.FirstName || '').toLowerCase().includes(search));
+      if (actif !== null) {
+          // Active = no DeletedDate (empty or null)
+          rows = rows.filter(r => {
+            const isActive = !r.DeletedDate || r.DeletedDate.trim() === '';
+            return isActive === actif;
+          });
+        }
+
+      render(rows);
+    }
+
+    function render(rows) {
+            const tb = document.querySelector('#tbl tbody');
+            tb.innerHTML = '';
+
+            const frag = document.createDocumentFragment();
+
+            rows.forEach(r => {
+              const tr = document.createElement('tr');
+              let controls = `<button class="btn-edit" data-driverid="${r.Id}">Modifier</button>`;
+              tr.innerHTML = `
+                <td>${r.FirstName ?? ''}</td>
+                <td>${getDispatchGroupName(r.FK_DispatchGroup)}</td>
+                <td class="cell-sd" data-field="startDate" data-driverid="${r.Id}"><span class="val">${r.StartDate ?? ''}</span></td>
+                <td class="cell-dd" data-field="deletedDate" data-driverid="${r.Id}"><span class="val">${r.DeletedDate ?? ''}</span></td>
+                <td>${isBroker(r.IsBroker)}</td>
+                <td>${controls}</td>
+              `;
+              frag.appendChild(tr);
+            });
+
+            tb.appendChild(frag);
+
+            const count = rows.length;
+            document.getElementById('count').textContent = count + (count > 1 ? ' résultats' : ' résultat');
+          }
+
+              // Helper to read cookie by name
+    function getCookie(name) {
+      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return v ? v.pop() : '';
+    }
+    function getCSRF() {
+        const m = document.querySelector('meta[name="csrf-token"]');
+        if (m && m.content) return m.content;
+        // fallback to cookie
+        const v = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+        if (v) return v.split('=')[1];
+        return '';
+      }
+
+
+function setupRowSelection() {
+            const tb = document.querySelector('#tbl tbody');
+            tb.addEventListener('click', async function (e) {
+              const tr = e.target.closest('tr');
+              // Row selection
+              if (tr && e.target.tagName !== 'BUTTON') tr.classList.toggle('selected');
+
+              // Edit / Save
+              if (e.target.matches('.btn-edit')) {
+                const btn = e.target;
+                const driverId = btn.dataset.driverid;
+                const row = btn.closest('tr');
+                const SDCell = row.querySelector('.cell-sd .val');
+                const DDCell = row.querySelector('.cell-dd .val');
+                const isEditing = btn.dataset.editing === '1';
+                
+                if (!isEditing) {
+                  // switch to inputs
+                  let sdVal = SDCell ? SDCell.textContent.trim() : '';
+                  let ddVal = DDCell ? DDCell.textContent.trim() : '';
+                  
+                  // Convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD for input type="date"
+                  function toDateInput(val) {
+                    if (!val) return '';
+                    // DD-MM-YYYY
+                    if (/^\d{2}-\d{2}-\d{4}$/.test(val)) {
+                      const [dd, mm, yyyy] = val.split('-');
+                      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    }
+                    // DD/MM/YYYY
+                    if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                      const [dd, mm, yyyy] = val.split('/');
+                      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    }
+                    // Already correct
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+                    return '';
+                  }
+                  
+                  function getToday() {
+                    const _t = new Date();
+                    return `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, '0')}-${String(_t.getDate()).padStart(2, '0')}`;
+                  }
+                  
+                  const sdValDate = toDateInput(sdVal) || getToday();
+                  const ddValDate = toDateInput(ddVal) || '';
+
+                  if (SDCell) SDCell.parentElement.innerHTML = `<input class="inp-sd" type="date" value="${sdValDate}">`;
+                  if (DDCell) DDCell.parentElement.innerHTML = `<input class="inp-dd" type="date" value="${ddValDate}">`;
+
+                  btn.textContent = 'Sauvegarder';
+                  btn.dataset.editing = '1';
+                } else {
+                  // save
+                  let sdRaw = row.querySelector('.inp-sd')?.value;
+                  let ddRaw = row.querySelector('.inp-dd')?.value;
+                  let sd = sdRaw == null ? null : sdRaw.trim();
+                  let dd = ddRaw == null ? null : ddRaw.trim();
+                  if (sd === '') sd = null;
+                  if (dd === '') dd = null;
+
+                  try {
+                    const res = await fetch('/api/petitsVehicules/update', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                      body: JSON.stringify({ DriverId: Number(driverId), StartDate: sd, DeletedDate: dd})
+                    });
+                    if (!res.ok) {
+                      const txt = await res.text(); throw new Error(txt || res.statusText);
+                    }
+                    
+                    // Reload data and re-render
+                    await loadAll();
+                    applyFilter();
+                    alert('Modifications enregistrées.');
+                  } catch (err) {
+                    alert('Erreur sauvegarde: ' + err.message);
+                  }
+                }
+              }
+
+              // Delete is not needed per user requirements
+            });
+          }
+
+    // Add petit vehicule driver - submit handler
+    async function addPetitVehiculeDriver() {
+      const nom = document.getElementById('nom').value;
+      const dispatchGroup = document.getElementById('dispatchGroup').value;
+      const startDate = document.getElementById('startDate').value;
+      const isBroker = document.getElementById('isBroker').checked;
+
+      if (!nom) { alert('Veuillez entrer un nom pour le chauffeur.'); return; }
+      if (!startDate) { alert('Veuillez sélectionner une date de début.'); return; }
+
+      const payload = {
+        FirstName: nom,
+        FK_DispatchGroup: Number(dispatchGroup),
+        startDate: startDate,
+        deletedDate: null,
+        PetitVehicule: '1',
+        isBroker: isBroker ? 1 : 0,
+        FK_BrokerId: isBroker ? 2030 : null
+      };
+
+      const btn = document.querySelector('.AjouterChauffeur');
+      btn.disabled = true;
+      btn.textContent = 'Ajout...';
+
+      try {
+        const csrf = getCSRF();
+        const res = await fetch('/api/petitsVehicules/addDriver', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        alert(`Chauffeur petit véhicule ${nom} ajouté avec succès ✅`);
+        // Reset form
+        document.getElementById('nom').value = '';
+        document.getElementById('dispatchGroup').value = '1';
+        document.getElementById('isBroker').checked = false;
+        // Keep startDate as today's date
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        document.getElementById('startDate').value = todayStr;
+
+        // Reload data
+        await loadAll();
+        applyFilter();
+      } catch (e) {
+        alert('Erreur ajout: ' + (e.message || e));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ajouter';
+      }
+    }
+
+    // Reset filters
+    function resetFilters() {
+      document.getElementById('f-search').value = '';
+      document.getElementById('f-actif').value = '';
+      try {
+        localStorage.removeItem('petitsVehicules_filter_search');
+        localStorage.removeItem('petitsVehicules_filter_actif');
+      } catch (e) {}
+      applyFilter();
+    }
+
+    // Restore saved filters from localStorage
+    function restoreFilters() {
+      try {
+        const savedSearch = localStorage.getItem('petitsVehicules_filter_search');
+        const savedActif = localStorage.getItem('petitsVehicules_filter_actif');
+        if (savedSearch !== null) document.getElementById('f-search').value = savedSearch;
+        if (savedActif !== null) document.getElementById('f-actif').value = savedActif;
+      } catch (e) {}
+    }
+
+    // Init
+    (async function init() {
+      try {
+        // Auto-populate startDate with today's date
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        document.getElementById('startDate').value = todayStr;
+
+        await loadAll();
+        restoreFilters();
+        applyFilter();
+        document.getElementById('f-search').addEventListener('input', applyFilter);
+        document.getElementById('f-actif').addEventListener('change', applyFilter);
+        document.getElementById('reset-filters').addEventListener('click', resetFilters);
+        document.querySelector('.AjouterChauffeur').addEventListener('click', addPetitVehiculeDriver);
+        setupRowSelection();
+      } catch (e) {
+        alert('Erreur chargement: ' + e.message);
+      }
+    })();
+
+
+
+
+</script> -->
+</body>
+</html>

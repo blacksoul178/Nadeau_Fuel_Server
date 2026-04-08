@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fuel'O'Matic - Taux</title>
+  <meta name="csrf-token" content="{{.CSRFToken}}">
+    <title>Fuel'O'Matic - Camions Broker</title>
     <link rel="stylesheet" href="/assets/style.css">
+    
 </head>
-
 <body>
     <header>
         <div>
@@ -19,18 +20,18 @@
         <!-- CSRF Token for logout -->
         <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
         <button type="submit" class="logout-btn">Logout</button>
-      </form>
+        </form>
         </div>
-  </header>
-    <br>
-    
-    <section id="content">
-        <h2>Bienvenue {{.Username}}</h2> 
-        {{if .IsAdmin}}
-        <div class="admin-section">
-            <h3>Admin Panel</h3>
-            <p>You have admin access. You can manage:</p>
-            <nav>
+</header>
+<br>
+
+<section id="content">
+    <h2>Bienvenue {{.Username}}</h2> 
+    {{if .IsAdmin}}
+    <div class="admin-section">
+        <h3>Admin Panel</h3>
+        <p>You have admin access. You can manage:</p>
+        <nav>
                 <a href="/admin">Admin Dashboard</a>
                 <a href="/admin/users">Manage Users</a>
                 <a href="/admin/syncruns">View last syncruns</a>
@@ -45,11 +46,11 @@
     <a href="/cartes"        class="tab">Cartes</a>
     <a href="/brokers"       class="tab">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
-    <a href="/taux"   class="tab active">Taux</a>
+    <a href="/taux"   class="tab">Taux</a>
     <a href="/peages"   class="tab">Péages</a>
-    <a href="/camionsBroker"   class="tab">Camions Broker</a>
+    <a href="/camionsBroker"   class="tab active">Camions Broker</a>
     {{ if or .IsAdmin .IsSuperUser }}
-    <span class="tab-spacer"></span>
+    <div class="tab-spacer"></div>
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab">Prix Fuel</a>
@@ -59,63 +60,50 @@
   </nav>
 </section>
 
+<main class="container">
+    <!-- Ajout de camion -->
+    <section class="panel">
+            <label for="Ajout de camion">Ajout de camion broker</label>
+            <div>
+                <label for="plaque">Plaque*</label>
+                <input type="text" name="plaque" id="plaque">
+            </div>
+            <div>
+                <label for="marque">Marque</label>
+                <input type="text" name="marque" id="marque">
+        </div>
+        <div>
+            <label for="nomBroker">Nom Broker</label>
+            <input type="text" name="nomBroker" id="nomBroker">
+        </div>
+    <button type="submit" class="AjouterCamion">Ajouter</button>
+</section>
+  </main>
+
 
 <main class="container">
-<section class="panel">
+    <!-- Filtres -->
+    <section class="panel">
+        <div>
+      <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Mack">
+            </div>
+                  <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
       <table id="tbl" class="table">
         <thead>
           <tr>
-            <th class="col-120">Année</th>
-            <th class="col-80">Semaine</th>
-            <th class="col-200">Prix Moyen Diesel</th>
+            <th>Plaque</th>
+            <th>Marque</th>
+            <th>Nom Broker</th>
+            <th>Controles</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </section>
-  </main>
-
-
-<script>
-    //Fetch Taux all week 
-    const state = { data: [] };
-
- async function loadAll() {
-      const res = await fetch('/api/taux/allWeek', { headers: { 'Accept': 'application/json' } });
-      if (!res.ok)throw new Error('HTTP ' + res.status);
-      state.data = await res.json();
-    }
-
-
-    function render(rows) {
-      const tb = document.querySelector('#tbl tbody');
-      tb.innerHTML = '';
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="col-120">${r.Annee ?? ''}</td>
-          <td>${r.Semaine ?? ''}</td>
-          <td>${r.PrixMoyen ?? ''}</td>
-          `;
-          // Add click listener to toggle selection
-        tr.addEventListener('click', function() {
-          this.classList.toggle('selected');
-        });
-        tb.appendChild(tr);
-      });
-    }
-
-    // Init
-    (async function init() {
-      try {
-        await loadAll();
-        let rows = state.data
-        render(rows)
-      } catch (e) {
-        alert('Erreur de chargement: ' + e.message);
-      }
-    })();
-
-</script>
-</body>
-</html>
+</main>

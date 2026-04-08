@@ -46,12 +46,15 @@
     <a href="/brokers"       class="tab">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
     <a href="/taux"   class="tab">Taux</a>
+    <a href="/peages"   class="tab">Péages</a>
+    <a href="/camionsBroker"   class="tab">Camions Broker</a>
     {{ if or .IsAdmin .IsSuperUser }}
     <div class="tab-spacer"></div>
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab active">Prix Fuel</a>
     <a href="/villes"   class="tab">Villes</a>
+    <a href="/rampe"   class="tab">Prix à la rampe</a>
     {{end}}
   </nav>
 </section>
@@ -59,10 +62,18 @@
 <main class="container">
 <label for="viewSelector"><strong>Choisir un tableau:</strong></label>
 <select id="viewSelector">
-    <option value="globalJour">Prix global / jours</option>
-    <option value="globalSemaine">Prix global / semaines</option>
-    <option value="diffJour">Différenciel / jours</option>
-    <option value="diffSemaine">Différentiel / semaines</option>
+    <option value="NONE">------------Global------------</option>
+    <option value="globalJour">Différentiel global / jours</option>
+    <option value="globalSemaine">Différentiel global / semaines</option>
+    <option value="NONE">------------Région------------</option>
+    <option value="diffRegionJour">Différenciel Région / jours</option>
+    <option value="diffRegionSemaine">Différentiel Région / semaines</option>
+    <option value="NONE">------------Villes------------</option>
+    <option value="diffJour">Différenciel Villes / jours</option>
+    <option value="diffSemaine">Différentiel Villes / semaines</option>
+    <option value="NONE">-------------Prix-------------</option>
+    <option value="regionJour">Prix Région / Jours</option>
+    <option value="regionSemaine">Prix Région / semaines</option>
     <option value="jour">Prix / jours</option>
     <option value="semaine">Prix / semaines</option>
 </select>
@@ -92,12 +103,28 @@
         headers: ["Année", "Semaine", "Ville", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
         rows: []
     }
+    const diffRegionJour = {
+        headers: ["Date", "Région", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+        rows: []
+    }
+    const diffRegionSemaine = {
+        headers: ["Année", "Semaine", "Région", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+        rows: []
+    }
     const jour = {
         headers: ["Date", "Pétrolière", "Ville", "PrixMoyen"],
         rows: []
     }
     const semaine = {
         headers: ["Année", "Semaine", "Pétrolière", "Ville", "PrixMoyen"],
+        rows: []
+    }
+    const regionJour = {
+        headers: ["Date", "Pétrolière", "Région", "PrixMoyen"],
+        rows: []
+    }
+    const regionSemaine = {
+        headers: ["Année", "Semaine", "Pétrolière", "Région", "PrixMoyen"],
         rows: []
     }
 
@@ -180,6 +207,42 @@
         renderTable("diffSemaine")
     };
 
+    async function loadDiffRegionJour() {
+        const response = await fetch("api/prixFuel/diffRegionJour");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Date.slice(0, 10), d.Region, d.Prix_Harnois, d.Diff_Esso, d.Diff_Petro, d.Diff_Ultramar, d.Diff_Irving, d.Diff_Belisle
+        ]);
+
+        //Inject into dataset
+        datasets.diffRegionJour = {
+            headers: ["Date", "Region", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+            rows: rows
+        }
+
+        renderTable("diffRegionJour")
+    };
+
+    async function loadDiffRegionSemaine() {
+        const response = await fetch("api/prixFuel/diffRegionSemaine");
+        const data = await response.json();
+        
+        //Convert API Data to form
+        const rows = data.map(d =>[
+            d.Annee, d.Semaine, d.Region, d.Prix_Harnois, d.Diff_Esso, d.Diff_Petro, d.Diff_Ultramar, d.Diff_Irving, d.Diff_Belisle
+        ]);
+
+        //Inject into dataset
+        datasets.diffRegionSemaine = {
+            headers: ["Année", "Semaine", "Region", "Prix Moyen Harnois", "Diff. Esso", "Diff. Petro", "Diff. Ultramar", "Diff. Irving", "Diff. Belisle"],
+            rows: rows
+        }
+
+        renderTable("diffRegionSemaine")
+    };
+
     async function loadJour() {
         const response = await fetch("api/prixFuel/jour");
         const data = await response.json();
@@ -216,6 +279,42 @@
         renderTable("semaine")
     };
 
+    async function loadRegionJour() {
+    const response = await fetch("api/prixFuel/regionJour");
+    const data = await response.json();
+    
+    //Convert API Data to form
+    const rows = data.map(d =>[
+        d.Date.slice(0, 10), d.Petroliere, d.Region, d.PrixMoyen,
+    ]);
+
+    //Inject into dataset
+    datasets.regionJour = {
+        headers: ["Date", "Pétrolière", "Region", "PrixMoyen"],
+        rows: rows
+    }
+
+    renderTable("regionJour")
+};
+
+    async function loadRegionSemaine() {
+    const response = await fetch("api/prixFuel/regionSemaine");
+    const data = await response.json();
+    
+    //Convert API Data to form
+    const rows = data.map(d =>[
+        d.Annee, d.Semaine, d.Petroliere, d.Region, d.PrixMoyen,
+        ]);
+
+    //Inject into dataset
+    datasets.regionSemaine = {
+        headers: ["Année", "Semaine", "Pétrolière", "Region", "PrixMoyen"],
+        rows: rows
+    }
+
+    renderTable("regionSemaine")
+};
+
     //Map selection to dataset
     const datasets = {
         globalJour,
@@ -224,6 +323,10 @@
         diffSemaine,
         jour,
         semaine,
+        diffRegionJour,
+        diffRegionSemaine,
+        regionJour,
+        regionSemaine
     };
 
     // Load data for a specific view if not already loaded
@@ -245,11 +348,23 @@
                 case 'diffSemaine':
                     await loadDiffSemaine();
                     break;
+                case 'diffRegionJour':
+                    await loadDiffRegionJour();
+                    break;
+                case 'diffRegionSemaine':
+                    await loadDiffRegionSemaine();
+                    break;
                 case 'jour':
                     await loadJour();
                     break;
                 case 'semaine':
                     await loadSemaine();
+                    break;
+                case 'regionJour':
+                    await loadRegionJour();
+                    break;
+                case 'regionSemaine':
+                    await loadRegionSemaine();
                     break;
             }
         }
@@ -267,7 +382,7 @@
         const data = datasets[datasetKey];
         const head = document.getElementById("tblHead");
         const body = document.getElementById("tblBody");
-        const diffFormatingList = ["globalJour", "globalSemaine", "diffJour", "diffSemaine"];
+        const diffFormatingList = ["globalJour", "globalSemaine", "diffJour", "diffSemaine", "diffRegionJour", "diffRegionSemaine"];
 
         //clear table
         head.innerHTML = "";
@@ -298,9 +413,9 @@
                         const num = parseFloat(cell);
 
                         if (!isNaN(num)) {
-                            if (num > 0) {
+                            if (num < 0) {
                                 style = 'style="color: #00b300; font-weight: bold;"';   // lush green
-                            } else if (num < 0) {
+                            } else if (num > 0) {
                                 style = 'style="color: #cc0000; font-weight: bold;"';   // bold red
                             } 
                         }

@@ -45,12 +45,15 @@
     <a href="/brokers"       class="tab active">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
     <a href="/taux"   class="tab">Taux</a>
+    <a href="/peages"   class="tab">Péages</a>
+    <a href="/camionsBroker"   class="tab">Camions Broker</a>
     {{ if or .IsAdmin .IsSuperUser }}
     <div class="tab-spacer"></div>
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab">Prix Fuel</a>
     <a href="/villes"   class="tab">Villes</a>
+    <a href="/rampe"   class="tab">Prix à la rampe</a>
     {{end}}
   </nav>
 </section>
@@ -69,6 +72,8 @@
             <select name="Compagnie Facturable" id="dispatchGroup">
               <option value="1">TGN</option>
               <option value="2">TMC</option>
+              <option value="5">GJF</option>
+              <option value="4">MTA</option>
             </select>
             </div>
             <div>

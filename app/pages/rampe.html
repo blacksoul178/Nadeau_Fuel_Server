@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fuel'O'Matic - Taux</title>
+    <title>Fuel'O'Matic - Prix à la rampe</title>
     <link rel="stylesheet" href="/assets/style.css">
 </head>
 
@@ -45,7 +45,7 @@
     <a href="/cartes"        class="tab">Cartes</a>
     <a href="/brokers"       class="tab">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
-    <a href="/taux"   class="tab active">Taux</a>
+    <a href="/taux"   class="tab">Taux</a>
     <a href="/peages"   class="tab">Péages</a>
     <a href="/camionsBroker"   class="tab">Camions Broker</a>
     {{ if or .IsAdmin .IsSuperUser }}
@@ -54,20 +54,22 @@
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab">Prix Fuel</a>
     <a href="/villes"   class="tab">Villes</a>
-    <a href="/rampe"   class="tab">Prix à la rampe</a>
+    <a href="/rampe"   class="tab active">Prix à la rampe</a>
     {{end}}
   </nav>
 </section>
 
-
 <main class="container">
+    <label for="panel">Prix attendu: <br>
+        Gros réservoir: Rack Valéro - 0.1075$/L<br>
+    Petits réservoirs: Rack Valéro - 0.0355$/L</label>
 <section class="panel">
       <table id="tbl" class="table">
         <thead>
           <tr>
-            <th class="col-120">Année</th>
-            <th class="col-80">Semaine</th>
-            <th class="col-200">Prix Moyen Diesel</th>
+            <th class="col-120">Date</th>
+            <th class="col-80">ULSDQC1</th>
+            <th class="col-200">ULSD#1</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -76,12 +78,11 @@
   </main>
 
 
-<script>
-    //Fetch Taux all week 
+  <script>
     const state = { data: [] };
 
- async function loadAll() {
-      const res = await fetch('/api/taux/allWeek', { headers: { 'Accept': 'application/json' } });
+    async function loadAll() {
+      const res = await fetch('/api/rampe/all', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       state.data = await res.json();
     }
@@ -93,9 +94,9 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="col-120">${r.Annee ?? ''}</td>
-          <td>${r.Semaine ?? ''}</td>
-          <td>${r.PrixMoyen ?? ''}</td>
+          <td>${r.Date ?? ''}</td>
+          <td>${r.ULSDQC1 ?? ''}</td>
+          <td>${r.ULSD1 ?? ''}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {
@@ -116,6 +117,5 @@
       }
     })();
 
-</script>
-</body>
-</html>
+
+  </script>

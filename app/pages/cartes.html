@@ -47,12 +47,15 @@
     <a href="/brokers"       class="tab">Compagnies Broker</a>
     <a href="/vehicules"     class="tab">Véhicules</a>
     <a href="/taux"   class="tab">Taux</a>
+    <a href="/peages"   class="tab">Péages</a>
+    <a href="/camionsBroker"   class="tab">Camions Broker</a>
     {{ if or .IsAdmin .IsSuperUser }}
     <div class="tab-spacer"></div>
     <a href="/transactions"  class="tab">Transactions</a>
     <a href="/petrolieres"   class="tab">Pétrolières</a>
     <a href="/prixFuel"   class="tab">Prix Fuel</a>
     <a href="/villes"   class="tab">Villes</a>
+    <a href="/rampe"   class="tab">Prix à la rampe</a>
     {{end}}
   </nav>
 </section>
@@ -60,41 +63,29 @@
 <main class="container">
     <!-- Ajout de Cartes -->
     <section class="panel">
-            <label for="Ajout de carde">Ajout de carte</label>
+            <label for="Ajout de carte">Ajout de carte</label>
             <div>
                 <label for="driverName">Nom du chauffeur *</label>
                 <input name="driverName" id="driverName" list="driverList" placeholder="Tapez un nom...">
                 <datalist id="driverList"></datalist>
                 <br>
-                <br>
                 <label for="cardNumber"># Carte *</label>
                 <input type="text" name="cardNumber" id="cardNumber">
-            </div>
-            </div>
-        <div>
-            <div>
-                <label for="Groupe?">Groupe?</label>
-                <select name="Groupe?" id="dispatchGroup">
-                    <option value="1">TGN</option>
-                  <option value="2">TMC</option>
-                </select>
-            </div>
-            <br>
-        <div>
-            <label for="NIP">NIP *</label>
-            <input type="text" name="NIP" id="NIP">
+
         </div>
     </div>
     <div>
-        <label for="Note">Note</label>
-        <input type="text" name="Note" id="Note">
-        <br>
+                  <label for="NIP">NIP *</label>
+            <input type="text" name="NIP" id="NIP">
         <br>
         <label for="oilCoName">Pétrolière *</label>
                 <input name="oilCoName" id="oilCoName" list="oilCoList" placeholder="Choisir une Pétrolière">
                 <datalist id="oilCoList"></datalist>
             </div>
     <div>
+       <label for="Note">Note</label>
+        <input type="text" name="Note" id="Note">
+        <br>
         <label for="Expiration">Expiration</label>
         <input type="date" name="Expiration" id="Expiration">
     <br>
@@ -136,6 +127,8 @@
         <option value="">Tous</option>
         <option value="TGN">TGN</option>
         <option value="TMC">TMC</option>
+        <option value="GJF">GJF</option>
+        <option value="MTA">MTA</option>
       </select>
       </div>
       <div class="spacer"></div>

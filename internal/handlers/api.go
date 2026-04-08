@@ -28,7 +28,6 @@ type User struct {
 func normalizeUsername(u string) string {
 	return strings.ToLower(strings.TrimSpace(u))
 }
-
 func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	u := normalizeUsername(username)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -481,7 +480,8 @@ func petrolieresAllHandler(w http.ResponseWriter, r *http.Request) {
 	query := `
 SELECT
     OilCoName,
-	Compte
+	Compte,
+	Banner
 FROM Fuel.dbo.OilCo
 ORDER BY OilCoName;
 `
@@ -497,6 +497,7 @@ ORDER BY OilCoName;
 	type rowOut struct {
 		OilCoName string `json:"OilCoName"`
 		Compte    string `json:"Compte"`
+		Banner    string `json:"Banner"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -504,8 +505,9 @@ ORDER BY OilCoName;
 		var (
 			OilCoName sql.NullString
 			Compte    sql.NullString
+			Banner    sql.NullString
 		)
-		if err := rows.Scan(&OilCoName, &Compte); err != nil {
+		if err := rows.Scan(&OilCoName, &Compte, &Banner); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on petrolieresAllHandler: " + err.Error())
 			return
@@ -514,6 +516,7 @@ ORDER BY OilCoName;
 		out = append(out, rowOut{
 			OilCoName: OilCoName.String,
 			Compte:    Compte.String,
+			Banner:    Banner.String,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -840,7 +843,7 @@ func prixFuelGlobalSemaineHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT [Annee]
+SELECT TOP (52) [Annee]
       ,[Semaine]
       ,[Prix_Harnois]
       ,[Diff_Esso] * 100
@@ -931,11 +934,11 @@ func prixFuelGlobalJourHandler(w http.ResponseWriter, r *http.Request) {
 	query := `
 SELECT TOP (365) [Date]
       ,[Prix_Harnois]
-      ,[Diff_Esso] *100
-      ,[Diff_Petro] *100
-      ,[Diff_Ultramar] *100
-      ,[Diff_Irving] *100
-      ,[Diff_Belisle] *100
+      ,[Diff_Esso] * 100
+      ,[Diff_Petro] * 100
+      ,[Diff_Ultramar] * 100
+      ,[Diff_Irving] * 100
+      ,[Diff_Belisle] * 100
   FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalJour]
   order by [Date] desc
 `
@@ -1013,15 +1016,15 @@ func prixFuelDiffSemaineHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT TOP (52) [Annee]
+SELECT TOP (1000) [Annee]
       ,[Semaine]
       ,[Ville]
       ,[Prix_Harnois]
-      ,[Diff_Esso] *100
-      ,[Diff_Petro] *100
-      ,[Diff_Ultramar] *100
-      ,[Diff_Irving] *100
-      ,[Diff_Belisle] *100
+      ,[Diff_Esso] * 100
+      ,[Diff_Petro] * 100
+      ,[Diff_Ultramar] * 100
+      ,[Diff_Irving] * 100
+      ,[Diff_Belisle] * 100
   FROM [Fuel].[dbo].[v_PrixFuel_Diff_semaine]
   order by Annee, Semaine desc
 
@@ -1108,7 +1111,7 @@ func prixFuelDiffJourHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-SELECT [Date]
+SELECT TOP (1000) [Date]
       ,[Ville]
       ,[Prix_Harnois]
       ,[Diff_Esso] * 100
@@ -1186,6 +1189,189 @@ SELECT [Date]
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
+func prixFuelDiffRegionSemaineHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT TOP (1000) [Annee]
+      ,[Semaine]
+      ,[Region]
+      ,[Prix_Harnois]
+      ,[Diff_Esso] * 100
+      ,[Diff_Petro] * 100
+      ,[Diff_Ultramar] * 100
+      ,[Diff_Irving] * 100
+      ,[Diff_Belisle] * 100
+  FROM [Fuel].[dbo].[v_PrixFuel_DiffRegionSemaine]
+  order by Annee desc, Semaine desc, Region asc;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelDiffRegionSemaineHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Annee         string  `json:"Annee"`
+		Semaine       string  `json:"Semaine"`
+		Region        string  `json:"Region"`
+		Prix_Harnois  string  `json:"Prix_Harnois"`
+		Diff_Esso     float64 `json:"Diff_Esso"`
+		Diff_Petro    float64 `json:"Diff_Petro"`
+		Diff_Ultramar float64 `json:"Diff_Ultramar"`
+		Diff_Irving   float64 `json:"Diff_Irving"`
+		Diff_Belisle  float64 `json:"Diff_Belisle"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Annee         sql.NullString
+			Semaine       sql.NullString
+			Region        sql.NullString
+			Prix_Harnois  sql.NullString
+			Diff_Esso     sql.NullFloat64
+			Diff_Petro    sql.NullFloat64
+			Diff_Ultramar sql.NullFloat64
+			Diff_Irving   sql.NullFloat64
+			Diff_Belisle  sql.NullFloat64
+		)
+		if err := rows.Scan(
+			&Annee,
+			&Semaine,
+			&Region,
+			&Prix_Harnois,
+			&Diff_Esso,
+			&Diff_Petro,
+			&Diff_Ultramar,
+			&Diff_Irving,
+			&Diff_Belisle,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on prixFuelDiffRegionSemaineHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Annee:         Annee.String,
+			Semaine:       Semaine.String,
+			Region:        Region.String,
+			Prix_Harnois:  Prix_Harnois.String,
+			Diff_Esso:     Diff_Esso.Float64,
+			Diff_Petro:    Diff_Petro.Float64,
+			Diff_Ultramar: Diff_Ultramar.Float64,
+			Diff_Irving:   Diff_Irving.Float64,
+			Diff_Belisle:  Diff_Belisle.Float64,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelDiffRegionSemaineHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelDiffRegionJourHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT TOP (1000) [Date]
+      ,[Region]
+      ,[Prix_Harnois]
+      ,[Diff_Esso] * 100
+      ,[Diff_Petro] * 100
+      ,[Diff_Ultramar] * 100
+      ,[Diff_Irving] * 100
+      ,[Diff_Belisle] * 100
+  FROM [Fuel].[dbo].[v_PrixFuel_DiffRegionJour]
+  order by [date] desc, Region asc;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelDiffRegionJourHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date          string  `json:"Date"`
+		Region        string  `json:"Region"`
+		Prix_Harnois  string  `json:"Prix_Harnois"`
+		Diff_Esso     float64 `json:"Diff_Esso"`
+		Diff_Petro    float64 `json:"Diff_Petro"`
+		Diff_Ultramar float64 `json:"Diff_Ultramar"`
+		Diff_Irving   float64 `json:"Diff_Irving"`
+		Diff_Belisle  float64 `json:"Diff_Belisle"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date          sql.NullString
+			Region        sql.NullString
+			Prix_Harnois  sql.NullString
+			Diff_Esso     sql.NullFloat64
+			Diff_Petro    sql.NullFloat64
+			Diff_Ultramar sql.NullFloat64
+			Diff_Irving   sql.NullFloat64
+			Diff_Belisle  sql.NullFloat64
+		)
+		if err := rows.Scan(
+			&Date,
+			&Region,
+			&Prix_Harnois,
+			&Diff_Esso,
+			&Diff_Petro,
+			&Diff_Ultramar,
+			&Diff_Irving,
+			&Diff_Belisle,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelDiffRegionJourHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:          Date.String,
+			Region:        Region.String,
+			Prix_Harnois:  Prix_Harnois.String,
+			Diff_Esso:     Diff_Esso.Float64,
+			Diff_Petro:    Diff_Petro.Float64,
+			Diff_Ultramar: Diff_Ultramar.Float64,
+			Diff_Irving:   Diff_Irving.Float64,
+			Diff_Belisle:  Diff_Belisle.Float64,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelDiffRegionJourHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
 func prixFuelSemaineHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1203,7 +1389,7 @@ SELECT [Annee]
       ,[Ville]
       ,[PrixMoyen]
   FROM [Fuel].[dbo].[v_PrixFuel_semaine]
-  order by Annee, Semaine desc
+  order by Annee, Semaine desc;
 `
 
 	rows, err := db.QueryContext(ctx, query)
@@ -1276,7 +1462,7 @@ SELECT [Date]
       ,[Ville]
       ,[PrixMoyen]
   FROM [Fuel].[dbo].[v_PrixFuel_Jour]
-  order by [Date] Desc
+  order by [Date] Desc;
 `
 
 	rows, err := db.QueryContext(ctx, query)
@@ -1323,6 +1509,149 @@ SELECT [Date]
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
 		logger.Info("Rows error on PrixFuelJourHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelRegionSemaineHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT TOP (1000) [Annee]
+      ,[Semaine]
+      ,[Region]
+      ,[Petroliere]
+      ,[PrixMoyen]
+  FROM [Fuel].[dbo].[v_PrixFuel_RegionSemaine]
+  order by Annee desc, Semaine desc, Region asc;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelRegionSemaineHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Annee      string `json:"Annee"`
+		Semaine    string `json:"Semaine"`
+		Petroliere string `json:"Petroliere"`
+		Region     string `json:"Region"`
+		PrixMoyen  string `json:"PrixMoyen"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Annee      sql.NullString
+			Semaine    sql.NullString
+			Petroliere sql.NullString
+			Region     sql.NullString
+			PrixMoyen  sql.NullString
+		)
+		if err := rows.Scan(
+			&Annee,
+			&Semaine,
+			&Petroliere,
+			&Region,
+			&PrixMoyen,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelRegionSemaineHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Annee:      Annee.String,
+			Semaine:    Semaine.String,
+			Petroliere: Petroliere.String,
+			Region:     Region.String,
+			PrixMoyen:  PrixMoyen.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelRegionSemaineHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func prixFuelRegionJourHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT TOP (1000) [Date]
+      ,[Region]
+      ,[Petroliere]
+      ,[PrixMoyen]
+  FROM [Fuel].[dbo].[v_PrixFuel_RegionJour]
+  order by [Date] desc, Region asc
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on PrixFuelRegionJourHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date       string `json:"Date"`
+		Petroliere string `json:"Petroliere"`
+		Region     string `json:"Region"`
+		PrixMoyen  string `json:"PrixMoyen"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date       sql.NullString
+			Petroliere sql.NullString
+			Region     sql.NullString
+			PrixMoyen  sql.NullString
+		)
+		if err := rows.Scan(
+			&Date,
+			&Petroliere,
+			&Region,
+			&PrixMoyen,
+		); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on PrixFuelRegionJourHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:       Date.String,
+			Petroliere: Petroliere.String,
+			Region:     Region.String,
+			PrixMoyen:  PrixMoyen.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on PrixFuelRegionJourHandler: " + err.Error())
 		return
 	}
 
@@ -1405,7 +1734,6 @@ func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
-
 func villesAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1467,7 +1795,248 @@ func villesAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
-		logger.Info("Rows error on brokersAllHandler: " + err.Error())
+		logger.Info("Rows error on villesAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func petitsVehiculesAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+	SELECT 
+	id, operatorNo, FirstName, FK_DispatchGroup,startDate, deletedDate, isBroker
+	from fuel.dbo.Drivers where petitVehicule = 1;
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on petitsVehiculesAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Id               string `json:"Id"`
+		OperatorNo       string `json:"OperatorNo"`
+		FirstName        string `json:"FirstName"`
+		FK_DispatchGroup string `json:"FK_DispatchGroup"`
+		StartDate        string `json:"StartDate"`
+		DeletedDate      string `json:"DeletedDate"`
+		IsBroker         string `json:"IsBroker"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Id               sql.NullString
+			OperatorNo       sql.NullString
+			FirstName        sql.NullString
+			FK_DispatchGroup sql.NullString
+			StartDate        sql.NullString
+			DeletedDate      sql.NullString
+			IsBroker         sql.NullString
+		)
+		if err := rows.Scan(&Id, &OperatorNo, &FirstName, &FK_DispatchGroup, &StartDate, &DeletedDate, &IsBroker); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on petitsVehiculesAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Id:               Id.String,
+			OperatorNo:       OperatorNo.String,
+			FirstName:        FirstName.String,
+			FK_DispatchGroup: FK_DispatchGroup.String,
+			StartDate:        StartDate.String,
+			DeletedDate:      DeletedDate.String,
+			IsBroker:         IsBroker.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on petitsVehiculesAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+	SELECT 
+	[Date], ULSDQC1, ULSD1 from Fuel.Dbo.valeroRackPrice;
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on rampeAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date    string  `json:"Date"`
+		ULSDQC1 float32 `json:"ULSDQC1"`
+		ULSD1   float32 `json:"ULSD1"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date    sql.NullTime
+			ULSDQC1 sql.NullFloat64
+			ULSD1   sql.NullFloat64
+		)
+		if err := rows.Scan(&Date, &ULSDQC1, &ULSD1); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on rampeAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:    Date.Time.Format("2006-01-02"),
+			ULSDQC1: float32(ULSDQC1.Float64) / 100,
+			ULSD1:   float32(ULSD1.Float64) / 100,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on rampeAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func peagesAllHandler(w http.ResponseWriter, r *http.Request) { // TO DO ONCE VIEW IS DONE
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+	SELECT 
+	
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on peagesAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date    string  `json:"Date"`
+		ULSDQC1 float32 `json:"ULSDQC1"`
+		ULSD1   float32 `json:"ULSD1"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date    sql.NullTime
+			ULSDQC1 sql.NullFloat64
+			ULSD1   sql.NullFloat64
+		)
+		if err := rows.Scan(&Date, &ULSDQC1, &ULSD1); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on peagesAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:    Date.Time.Format("2006-01-02"),
+			ULSDQC1: float32(ULSDQC1.Float64) / 100,
+			ULSD1:   float32(ULSD1.Float64) / 100,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on peagesAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func camionsBrokerAllHandler(w http.ResponseWriter, r *http.Request) { // TO DO ONCE VIEW IS DONE
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+	SELECT 
+	
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on camionsBrokerAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Date    string  `json:"Date"`
+		ULSDQC1 float32 `json:"ULSDQC1"`
+		ULSD1   float32 `json:"ULSD1"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Date    sql.NullTime
+			ULSDQC1 sql.NullFloat64
+			ULSD1   sql.NullFloat64
+		)
+		if err := rows.Scan(&Date, &ULSDQC1, &ULSD1); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on camionsBrokerAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Date:    Date.Time.Format("2006-01-02"),
+			ULSDQC1: float32(ULSDQC1.Float64) / 100,
+			ULSD1:   float32(ULSD1.Float64) / 100,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on camionsBrokerAllHandler: " + err.Error())
 		return
 	}
 
@@ -1560,9 +2129,13 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Resolve driverName -> Drivers.id using FirstName + ' ' + LastName
+	// Resolve driverName -> Drivers.id using FirstName + ' ' + LastName (or just FirstName for petit vehicule drivers)
 	var driverId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM Fuel.dbo.Drivers WHERE LTRIM(RTRIM(FirstName + ' ' + LastName)) = @name`, sql.Named("name", strings.TrimSpace(body.DriverName))).Scan(&driverId); err != nil {
+	if err := tx.QueryRowContext(ctx, `
+		SELECT id FROM Fuel.dbo.Drivers 
+		WHERE LTRIM(RTRIM(FirstName + ' ' + ISNULL(LastName, ''))) = @name
+		   OR FirstName = @name
+	`, sql.Named("name", strings.TrimSpace(body.DriverName))).Scan(&driverId); err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusBadRequest, "driver not found")
 			return
@@ -1843,7 +2416,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !IsAdmin(r) || !IsSuperUser(r) {
+	if !IsAdmin(r) && !IsSuperUser(r) {
 		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
@@ -2724,4 +3297,423 @@ func villesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info(fmt.Sprintf("User: %s updated Ville %s to Normalized %s", LastUpdateBy, SupplierCity, NormalizedCity))
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func petitsVehiculesAddDriver(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Parse request JSON (includes optional csrf token in body)
+	type reqBody struct {
+		FirstName        string `json:"FirstName"`
+		FK_DispatchGroup int    `json:"FK_DispatchGroup"`
+		StartDate        string `json:"startDate"`
+		DeletedDate      string `json:"deletedDate"`
+		PetitVehicule    string `json:"PetitVehicule"`
+		IsBroker         int    `json:"isBroker"`
+		FK_BrokerId      *int   `json:"FK_BrokerId"`
+		CSRF             string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+
+	// Read raw body for diagnostics
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on petitsVehiculesAddDriver: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	logger.Info("petitsVehiculesAddDriver raw body: " + string(b))
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on petitsVehiculesAddDriver: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+	logger.Info(fmt.Sprintf("Utilisateur %s ajoute le chauffeur de petit véhicule: Nom: nom=%s, dispatchGroup=%d, startDate=%q deletedDate=%s", user, body.FirstName, body.FK_DispatchGroup, body.StartDate, body.DeletedDate))
+
+	// Determine CSRF token: header -> body -> cookie
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to petitsVehiculesAddDriver")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		return
+	}
+
+	// Generate and set a fresh token for subsequent requests
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	} else {
+		logger.Info("Failed to generate CSRF token after petitsVehiculesAddDriver: " + err.Error())
+	}
+
+	if strings.TrimSpace(body.FirstName) == "" {
+		respondWithError(w, http.StatusBadRequest, "invalid petitsVehicules payload")
+		return
+	}
+	if body.StartDate == "" {
+		respondWithError(w, http.StatusBadRequest, "startDate required")
+		return
+	}
+
+	// Start transaction
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on petitsVehiculesAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Insert driver and return new ID using OUTPUT
+	insertQ := `
+	SET NOCOUNT ON;
+	INSERT INTO Fuel.dbo.Drivers (operatorNo, FirstName, FK_DispatchGroup, startDate, deletedDate, petitVehicule, isBroker, FK_BrokerId)
+	OUTPUT INSERTED.id
+	VALUES (@operatorNo, @FirstName, @FK_DispatchGroup, @startDate, @deletedDate, 1, @isBroker, @FK_BrokerId);
+	`
+
+	// Handle nullable deletedDate - convert "None" or empty to NULL
+	var deletedDateParam interface{}
+	if body.DeletedDate != "" && body.DeletedDate != "None" {
+		deletedDateParam = body.DeletedDate
+	} else {
+		deletedDateParam = nil
+	}
+
+	var newId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, insertQ,
+		sql.Named("operatorNo", "Petit"),
+		sql.Named("FirstName", body.FirstName),
+		sql.Named("FK_DispatchGroup", body.FK_DispatchGroup),
+		sql.Named("startDate", body.StartDate),
+		sql.Named("deletedDate", deletedDateParam),
+		sql.Named("isBroker", body.IsBroker),
+		sql.Named("FK_BrokerId", body.FK_BrokerId),
+	).Scan(&newId); err != nil {
+		logger.Info("Insert error on petitsVehiculesAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	logger.Info(fmt.Sprintf("petitsVehiculesAddDriver inserted id (tx): %v", newId))
+
+	// Verify insertion
+	var verifyId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.Drivers WHERE FirstName = @FirstName AND petitVehicule = 1 ORDER BY id DESC`, sql.Named("FirstName", body.FirstName)).Scan(&verifyId); err != nil {
+		if err == sql.ErrNoRows {
+			logger.Info("Verification select: no rows found after insert for FirstName=" + body.FirstName)
+		} else {
+			logger.Info("Verification select error on petitsVehiculesAddDriver: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+			return
+		}
+	} else {
+		logger.Info(fmt.Sprintf("Verification select found id: %v", verifyId))
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on petitsVehiculesAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	res := map[string]interface{}{
+		"id":        nil,
+		"firstName": body.FirstName,
+	}
+	if newId.Valid {
+		res["id"] = int(newId.Int64)
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+}
+
+// petrolieresAddOilCoHandler - Add a new OilCo (Pétrolière)
+func petrolieresAddOilCoHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Parse request JSON
+	type reqBody struct {
+		OilCoName string `json:"OilCoName"`
+		Compte    string `json:"Compte"`
+		Banner    string `json:"Banner"`
+		CSRF      string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+
+	// Read raw body for diagnostics
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on petrolieresAddOilCoHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	logger.Info("petrolieresAddOilCoHandler raw body: " + string(b))
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on petrolieresAddOilCoHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+	logger.Info(fmt.Sprintf("Utilisateur %s ajoute une pétrolière: OilCoName=%s, Compte=%s, Banner=%s", user, body.OilCoName, body.Compte, body.Banner))
+
+	// Determine CSRF token: header -> body -> cookie
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to petrolieresAddOilCoHandler")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		return
+	}
+
+	// Generate and set a fresh token for subsequent requests
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	} else {
+		logger.Info("Failed to generate CSRF token after petrolieresAddOilCoHandler: " + err.Error())
+	}
+
+	if strings.TrimSpace(body.OilCoName) == "" {
+		respondWithError(w, http.StatusBadRequest, "OilCoName required")
+		return
+	}
+
+	// Start transaction
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on petrolieresAddOilCoHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Insert OilCo and return new ID using OUTPUT
+	insertQ := `
+	SET NOCOUNT ON;
+	INSERT INTO Fuel.dbo.OilCo (OilCoName, Compte, Banner)
+	OUTPUT INSERTED.id
+	VALUES (@OilCoName, @Compte, @Banner);
+	`
+	var newId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, insertQ,
+		sql.Named("OilCoName", body.OilCoName),
+		sql.Named("Compte", body.Compte),
+		sql.Named("Banner", body.Banner),
+	).Scan(&newId); err != nil {
+		logger.Info("Insert error on petrolieresAddOilCoHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	logger.Info(fmt.Sprintf("petrolieresAddOilCoHandler inserted id (tx): %v", newId))
+
+	// Verify insertion
+	var verifyId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.OilCo WHERE OilCoName = @OilCoName ORDER BY id DESC`, sql.Named("OilCoName", body.OilCoName)).Scan(&verifyId); err != nil {
+		if err == sql.ErrNoRows {
+			logger.Info("Verification select: no rows found after insert for OilCoName=" + body.OilCoName)
+		} else {
+			logger.Info("Verification select error on petrolieresAddOilCoHandler: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+			return
+		}
+	} else {
+		logger.Info(fmt.Sprintf("Verification select found id: %v", verifyId))
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on petrolieresAddOilCoHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	res := map[string]interface{}{
+		"id":        nil,
+		"OilCoName": body.OilCoName,
+		"Compte":    body.Compte,
+		"Banner":    body.Banner,
+	}
+	if newId.Valid {
+		res["id"] = int(newId.Int64)
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+}
+
+// petitsVehiculesUpdateHandler - Update StartDate and DeletedDate for a petit vehicule driver
+func petitsVehiculesUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Read body
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on petitsVehiculesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	type reqBody struct {
+		DriverId    int     `json:"DriverId"`
+		StartDate   *string `json:"StartDate"`
+		DeletedDate *string `json:"DeletedDate"`
+		CSRF        string  `json:"csrf,omitempty"`
+	}
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on petitsVehiculesUpdateHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	// CSRF token validation
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to petitsVehiculesUpdateHandler")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		return
+	}
+
+	// Generate fresh token
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	}
+
+	if body.DriverId <= 0 {
+		respondWithError(w, http.StatusBadRequest, "invalid DriverId")
+		return
+	}
+
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+	logger.Info(fmt.Sprintf("Utilisateur %s met à jour le chauffeur petit vehicule DriverId=%d", user, body.DriverId))
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on petitsVehiculesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Update driver dates - use TRY_CONVERT to handle date format conversion
+	updateQ := `
+UPDATE Fuel.dbo.Drivers
+SET startDate = TRY_CONVERT(date, @startDate, 120),
+	deletedDate = TRY_CONVERT(date, @deletedDate, 120)
+WHERE id = @driverId AND petitVehicule = 1;
+`
+
+	// Prepare nullable params for dates: send NULL when value is nil or empty
+	var startDateParam interface{}
+	if body.StartDate != nil {
+		s := strings.TrimSpace(*body.StartDate)
+		if s != "" {
+			startDateParam = s
+		} else {
+			startDateParam = nil
+		}
+	} else {
+		startDateParam = nil
+	}
+
+	var deletedDateParam interface{}
+	if body.DeletedDate != nil {
+		s := strings.TrimSpace(*body.DeletedDate)
+		if s != "" {
+			deletedDateParam = s
+		} else {
+			deletedDateParam = nil
+		}
+	} else {
+		deletedDateParam = nil
+	}
+
+	if _, err := tx.ExecContext(ctx, updateQ,
+		sql.Named("startDate", startDateParam),
+		sql.Named("deletedDate", deletedDateParam),
+		sql.Named("driverId", body.DriverId),
+	); err != nil {
+		logger.Info("Exec error on petitsVehiculesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on petitsVehiculesUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Driver dates updated successfully",
+	})
 }
