@@ -103,6 +103,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	// mux.Handle("POST /api/petitsVehicules/addDriver", requireLogin(http.HandlerFunc(petitsVehiculesAddDriver)))
 	// mux.Handle("POST /api/petitsVehicules/update", requireLogin(http.HandlerFunc(petitsVehiculesUpdateHandler)))
 	mux.Handle("POST /api/petrolieres/addOilCo", requireLogin(http.HandlerFunc(petrolieresAddOilCoHandler)))
+	mux.Handle("POST /api/transactions/update-note", requireLogin(http.HandlerFunc(updateNoteHandler)))
 
 	// local scripts
 	mux.Handle("POST /api/drivers/sync", requireLogin(http.HandlerFunc(syncDriversHandler)))

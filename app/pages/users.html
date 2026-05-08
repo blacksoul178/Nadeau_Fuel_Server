@@ -153,6 +153,7 @@
                         <th class="col-150">Nom d'utilisateur</th>
                         <th class="col-80">Admin</th>
                         <th class="col-100">Super User</th>
+                        <th class="col-100">Désactivé ?</th>
                         <th class="col-150">Actions</th>
                     </tr>
                 </thead>
@@ -177,6 +178,10 @@
                 <label>
                     <input type="checkbox" id="userEditIsSuperUser" />
                     Super Utilisateur
+                </label>
+                <label>
+                    <input type="checkbox" id="userEditIsDisabled" />
+                    Désactivé
                 </label>
             </div>
             <div>
@@ -262,12 +267,13 @@
             rows.forEach(u => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${escapeHtml(u.SiteUser)}</td>
+                    <td>${escapeHtml(u.AppUser)}</td>
                     <td>${u.IsAdmin ? 'Oui' : 'Non'}</td>
                     <td>${u.IsSuperUser ? 'Oui' : 'Non'}</td>
+                    <td>${u.IsDisabled ? 'Oui' : 'Non'}</td>
                     <td>
-                        <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.SiteUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}">Éditer</button>
-                        <button class="btn-delete" data-userid="${u.id}" data-username="${escapeHtml(u.SiteUser)}">Supprimer</button>
+                        <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}" data-isdisabled="${u.IsDisabled}">Éditer</button>
+                        <button class="btn-delete" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}">Désactivé</button>
                     </td>
                 `;
                 tb.appendChild(tr);
@@ -322,7 +328,7 @@
                 const userId = e.target.dataset.userid;
                 const username = e.target.dataset.username;
 
-                if (!confirm(`Voulez-vous vraiment supprimer l'utilisateur "${username}"?`)) return;
+                if (!confirm(`Voulez-vous vraiment désactiver l'utilisateur "${username}"?`)) return;
 
                 try {
                     const res = await fetch('/api/admin/users/delete', {
@@ -336,7 +342,7 @@
                         throw new Error(txt);
                     }
 
-                    showFlash('Utilisateur supprimé.');
+                    showFlash('Utilisateur désactivé.');
                     await loadAll();
                     render(state.data);
                 } catch (err) {
@@ -349,8 +355,9 @@
                 const username = e.target.dataset.username;
                 const isAdmin = e.target.dataset.isadmin === 'true';
                 const isSuperUser = e.target.dataset.issuperuser === 'true';
+                const isDisabled = e.target.dataset.isdisabled === 'true';
                 
-                showEditUserModal(userId, username, isAdmin, isSuperUser);
+                showEditUserModal(userId, username, isAdmin, isSuperUser, isDisabled);
             }
         });
 
@@ -433,12 +440,13 @@
         const submitUserPwdBtn = document.getElementById('submitUserEditBtn');
         let currentUserIdToChange = null;
 
-        function showEditUserModal(userId, username, isAdmin, isSuperUser) {
+        function showEditUserModal(userId, username, isAdmin, isSuperUser, isDisabled) {
             currentUserIdToChange = userId;
             document.getElementById('userEditTarget').textContent = username;
             document.getElementById('userNewPassword').value = '';
             document.getElementById('userEditIsAdmin').checked = isAdmin;
             document.getElementById('userEditIsSuperUser').checked = isSuperUser;
+            document.getElementById('userEditIsDisabled').checked = isDisabled;
             userPwdModal.style.display = 'flex';
         }
 
@@ -456,12 +464,13 @@
             const newPassword = document.getElementById('userNewPassword').value.trim();
             const isAdmin = document.getElementById('userEditIsAdmin').checked;
             const isSuperUser = document.getElementById('userEditIsSuperUser').checked;
+            const isDisabled = document.getElementById('userEditIsDisabled').checked;
 
             try {
                 const res = await fetch('/api/admin/users/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-                    body: JSON.stringify({ userId: parseInt(currentUserIdToChange), newPassword, isAdmin, isSuperUser })
+                    body: JSON.stringify({ userId: parseInt(currentUserIdToChange), newPassword, isAdmin, isSuperUser, isDisabled })
                 });
 
                 if (!res.ok) {

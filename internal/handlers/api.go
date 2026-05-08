@@ -38,13 +38,14 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 		hash        string
 		isAdmin     bool
 		isSuperUser bool
+		isDisabled  bool
 	)
 
 	err := db.QueryRowContext(ctx, `
-		SELECT id, password_hash, isAdmin, isSuperUser
-		FROM dbo.SiteUser
-		WHERE SiteUser=@u
-	`, sql.Named("u", u)).Scan(&id, &hash, &isAdmin, &isSuperUser)
+		SELECT id, password_hash, isAdmin, isSuperUser, isDisabled
+		FROM dbo.AppUser
+		WHERE AppUser=@u
+	`, sql.Named("u", u)).Scan(&id, &hash, &isAdmin, &isSuperUser, &isDisabled)
 
 	if err == sql.ErrNoRows {
 		// Ne divulgue pas si l'utilisateur existe ou non
@@ -59,7 +60,12 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 		return nil, errors.New("invalid credentials")
 	}
 
+	// Check if user is disabled
+	if isDisabled {
+		return nil, errors.New("user account is disabled")
+	}
 	return &User{
+
 		ID:          id,
 		Username:    u,
 		IsAdmin:     isAdmin,
@@ -197,7 +203,7 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, SiteUser, IsAdmin, IsSuperUser FROM dbo.SiteUser ORDER BY SiteUser`
+	query := `SELECT id, AppUser, IsAdmin, IsSuperUser, IsDisabled FROM dbo.AppUser ORDER BY AppUser`
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
@@ -209,9 +215,10 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	type userOut struct {
 		Id          int    `json:"id"`
-		SiteUser    string `json:"SiteUser"`
+		AppUser     string `json:"AppUser"`
 		IsAdmin     bool   `json:"IsAdmin"`
 		IsSuperUser bool   `json:"IsSuperUser"`
+		IsDisabled  bool   `json:"IsDisabled"`
 	}
 
 	out := make([]userOut, 0, 256)
@@ -219,11 +226,12 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var (
 			id          sql.NullInt32
-			siteUser    sql.NullString
+			AppUser     sql.NullString
 			isAdmin     sql.NullBool
 			isSuperUser sql.NullBool
+			isDisabled  sql.NullBool
 		)
-		if err := rows.Scan(&id, &siteUser, &isAdmin, &isSuperUser); err != nil {
+		if err := rows.Scan(&id, &AppUser, &isAdmin, &isSuperUser, &isDisabled); err != nil {
 			logger.Info("Scan error on usersAllHandler: " + err.Error())
 			respondWithError(w, http.StatusInternalServerError, "Scan error")
 			return
@@ -231,9 +239,10 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 
 		out = append(out, userOut{
 			Id:          int(id.Int32),
-			SiteUser:    siteUser.String,
+			AppUser:     AppUser.String,
 			IsAdmin:     isAdmin.Bool,
 			IsSuperUser: isSuperUser.Bool,
+			IsDisabled:  isDisabled.Bool,
 		})
 	}
 
@@ -1669,12 +1678,16 @@ func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 	SELECT
+		FK_OilCoId,
+		Compte,
 		OilCoName,
 		DerniereSynchro,
 		DerniereTransaction,
-		JoursDepuisSynchro
+		JoursDeRetard,
+		Note
 	FROM Fuel.dbo.DerniereSynchroComplete
-	ORDER BY OilCoName ASC
+	where OilCoName != 'Traversiers'
+	ORDER BY FK_OilCoId ASC
 	`
 
 	rows, err := db.QueryContext(ctx, query)
@@ -1686,28 +1699,37 @@ func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type SyncStatus struct {
+		OilCoID             int    `json:"OilCoID"`
+		Compte              string `json:"Compte"`
 		OilCoName           string `json:"OilCoName"`
 		DerniereSynchro     string `json:"DerniereSynchro"`
 		DerniereTransaction string `json:"DerniereTransaction"`
-		JoursDepuisSynchro  int    `json:"JoursDepuisSynchro"`
+		JoursDeRetard       int    `json:"JoursDeRetard"`
+		Note                string `json:"Note"`
 	}
 	out := make([]SyncStatus, 0, 256)
 
 	for rows.Next() {
 		var (
+			oilCoId             sql.NullInt64
+			compte              sql.NullString
 			oilCoName           sql.NullString
 			derniereSynchro     sql.NullTime
 			derniereTransaction sql.NullTime
-			joursDepuisSynchro  sql.NullInt64
+			joursDeRetard       sql.NullInt64
+			note                sql.NullString
 		)
-		if err := rows.Scan(&oilCoName, &derniereSynchro, &derniereTransaction, &joursDepuisSynchro); err != nil {
+		if err := rows.Scan(&oilCoId, &compte, &oilCoName, &derniereSynchro, &derniereTransaction, &joursDeRetard, &note); err != nil {
 			logger.Info("Scan error on syncStatusHandler: " + err.Error())
 			http.Error(w, "scan error: "+err.Error(), 500)
 			return
 		}
 
 		syncStatus := SyncStatus{
+			OilCoID:   int(oilCoId.Int64),
+			Compte:    compte.String,
 			OilCoName: oilCoName.String,
+			Note:      note.String,
 		}
 
 		if derniereSynchro.Valid {
@@ -1718,8 +1740,8 @@ func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 			syncStatus.DerniereTransaction = derniereTransaction.Time.Format("2006-01-02T15:04:05")
 		}
 
-		if joursDepuisSynchro.Valid {
-			syncStatus.JoursDepuisSynchro = int(joursDepuisSynchro.Int64)
+		if joursDeRetard.Valid {
+			syncStatus.JoursDeRetard = int(joursDeRetard.Int64)
 		}
 
 		out = append(out, syncStatus)
@@ -1734,6 +1756,57 @@ func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
+
+func updateNoteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type UpdateNoteRequest struct {
+		OilcoId int    `json:"oilcoId"`
+		Note    string `json:"note"`
+	}
+
+	var req UpdateNoteRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	query := `
+	UPDATE Fuel.dbo.OilCo
+	SET note = @note
+	WHERE id = @id
+	`
+
+	result, err := db.ExecContext(ctx, query, sql.Named("note", req.Note), sql.Named("id", req.OilcoId))
+	if err != nil {
+		logger.Info("Update error on updateNoteHandler: " + err.Error())
+		http.Error(w, "update error: "+err.Error(), 500)
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		logger.Info("RowsAffected error on updateNoteHandler: " + err.Error())
+		http.Error(w, "rows affected error: "+err.Error(), 500)
+		return
+	}
+
+	if rowsAffected == 0 {
+		http.Error(w, "no rows updated", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Note updated successfully"})
+}
+
 func villesAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2416,7 +2489,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !IsAdmin(r) && !IsSuperUser(r) {
+	if !IsAdmin(r) {
 		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
@@ -2925,7 +2998,7 @@ func usersCreateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	insertQ := `INSERT INTO dbo.SiteUser (SiteUser, password_hash, IsAdmin, IsSuperUser) VALUES (@username, @hash, @isAdmin, @isSuperUser)`
+	insertQ := `INSERT INTO dbo.AppUser (AppUser, password_hash, IsAdmin, IsSuperUser) VALUES (@username, @hash, @isAdmin, @isSuperUser)`
 
 	if _, err := db.ExecContext(ctx, insertQ,
 		sql.Named("username", username),
@@ -2980,7 +3053,7 @@ func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Prevent deleting current user
 	var targetUsername string
-	err = db.QueryRowContext(ctx, "SELECT SiteUser FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.ID)).Scan(&targetUsername)
+	err = db.QueryRowContext(ctx, "SELECT AppUser FROM dbo.AppUser WHERE id = @id", sql.Named("id", body.ID)).Scan(&targetUsername)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusNotFound, "User not found")
@@ -2992,13 +3065,13 @@ func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.EqualFold(targetUsername, session.Username) {
-		respondWithError(w, http.StatusForbidden, "Cannot delete your own user account")
+		respondWithError(w, http.StatusForbidden, "Cannot disable your own user account")
 		return
 	}
 
 	// Prevent deleting last admin user
 	var adminCount int
-	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dbo.SiteUser WHERE IsAdmin = 1").Scan(&adminCount)
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dbo.AppUser WHERE IsAdmin = 1").Scan(&adminCount)
 	if err != nil {
 		logger.Info("Count error on usersDeleteHandler: " + err.Error())
 		respondWithError(w, http.StatusInternalServerError, "Database error")
@@ -3006,7 +3079,7 @@ func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var targetIsAdmin bool
-	err = db.QueryRowContext(ctx, "SELECT IsAdmin FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.ID)).Scan(&targetIsAdmin)
+	err = db.QueryRowContext(ctx, "SELECT IsAdmin FROM dbo.AppUser WHERE id = @id", sql.Named("id", body.ID)).Scan(&targetIsAdmin)
 	if err != nil {
 		logger.Info("Admin check error on usersDeleteHandler: " + err.Error())
 		respondWithError(w, http.StatusInternalServerError, "Database error")
@@ -3014,11 +3087,13 @@ func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetIsAdmin && adminCount <= 1 {
-		respondWithError(w, http.StatusForbidden, "Cannot delete the last admin user")
+		respondWithError(w, http.StatusForbidden, "Cannot disable the last admin user")
 		return
 	}
 
-	deleteQ := `DELETE FROM dbo.SiteUser WHERE id = @id`
+	deleteQ := `update fuel.dbo.AppUser
+	set IsDisabled = 1 
+	WHERE id = @id`
 
 	result, err := db.ExecContext(ctx, deleteQ, sql.Named("id", body.ID))
 	if err != nil {
@@ -3039,7 +3114,7 @@ func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info(fmt.Sprintf("User ID %d deleted by %s", body.ID, session.Username))
+	logger.Info(fmt.Sprintf("User ID %d disabled by %s", body.ID, session.Username))
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 func usersChangePasswordForUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -3088,7 +3163,7 @@ func usersChangePasswordForUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	err = db.QueryRowContext(ctx, "SELECT SiteUser FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.UserID)).Scan(&targetUsername)
+	err = db.QueryRowContext(ctx, "SELECT AppUser FROM dbo.AppUser WHERE id = @id", sql.Named("id", body.UserID)).Scan(&targetUsername)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusNotFound, "User not found")
@@ -3113,7 +3188,7 @@ func usersChangePasswordForUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update password
-	updateQ := `UPDATE dbo.SiteUser SET password_hash = @hash WHERE id = @id`
+	updateQ := `UPDATE dbo.AppUser SET password_hash = @hash WHERE id = @id`
 	if _, err := db.ExecContext(ctx, updateQ,
 		sql.Named("hash", string(newHash)),
 		sql.Named("id", body.UserID),
@@ -3150,6 +3225,7 @@ func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		NewPassword string `json:"newPassword"`
 		IsAdmin     bool   `json:"isAdmin"`
 		IsSuperUser bool   `json:"isSuperUser"`
+		IsDisabled  bool   `json:"isDisabled"`
 	}
 
 	var body reqBody
@@ -3169,7 +3245,7 @@ func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	// Get target user info
 	var targetUsername string
 	var targetIsAdmin bool
-	err = db.QueryRowContext(ctx, "SELECT SiteUser, IsAdmin FROM dbo.SiteUser WHERE id = @id", sql.Named("id", body.UserID)).Scan(&targetUsername, &targetIsAdmin)
+	err = db.QueryRowContext(ctx, "SELECT AppUser, IsAdmin FROM dbo.AppUser WHERE id = @id", sql.Named("id", body.UserID)).Scan(&targetUsername, &targetIsAdmin)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusNotFound, "User not found")
@@ -3183,7 +3259,7 @@ func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if trying to remove admin status from last admin
 	if targetIsAdmin && !body.IsAdmin {
 		var adminCount int
-		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dbo.SiteUser WHERE IsAdmin = 1").Scan(&adminCount)
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dbo.AppUser WHERE IsAdmin = 1").Scan(&adminCount)
 		if err != nil {
 			logger.Info("Count error on usersUpdateHandler: " + err.Error())
 			respondWithError(w, http.StatusInternalServerError, "Database error")
@@ -3209,19 +3285,21 @@ func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		updateQ = `UPDATE dbo.SiteUser SET password_hash = @hash, IsAdmin = @isAdmin, IsSuperUser = @isSuperUser WHERE id = @id`
+		updateQ = `UPDATE dbo.AppUser SET password_hash = @hash, IsAdmin = @isAdmin, IsSuperUser = @isSuperUser, IsDisabled = @isDisabled WHERE id = @id`
 		args = append(args,
 			sql.Named("hash", string(newHash)),
 			sql.Named("isAdmin", body.IsAdmin),
 			sql.Named("isSuperUser", body.IsSuperUser),
 			sql.Named("id", body.UserID),
+			sql.Named("isDisabled", body.IsDisabled),
 		)
 	} else {
-		updateQ = `UPDATE dbo.SiteUser SET IsAdmin = @isAdmin, IsSuperUser = @isSuperUser WHERE id = @id`
+		updateQ = `UPDATE dbo.AppUser SET IsAdmin = @isAdmin, IsSuperUser = @isSuperUser, IsDisabled = @isDisabled WHERE id = @id`
 		args = append(args,
 			sql.Named("isAdmin", body.IsAdmin),
 			sql.Named("isSuperUser", body.IsSuperUser),
 			sql.Named("id", body.UserID),
+			sql.Named("isDisabled", body.IsDisabled),
 		)
 	}
 
@@ -3449,6 +3527,9 @@ func petitsVehiculesAddDriver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, res)
+}
+func petrolieresNotesUpdate(w http.ResponseWriter, r *http.Request){
+	
 }
 
 // petrolieresAddOilCoHandler - Add a new OilCo (Pétrolière)

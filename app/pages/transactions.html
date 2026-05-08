@@ -30,10 +30,12 @@
 /* Colors depending on rating - applied to entire row - warm tones */
 tr.rating-1 {
     background-color: #8dd89d; /* warm green */
+    color: #2a2a2a;
     font-weight: 600;
 }
 tr.rating-2 {
     background-color: #e0c09f; /* warm tan */
+    color: #2a2a2a;
     font-weight: 600;
 }
 tr.rating-3 {
@@ -117,18 +119,21 @@ tr.rating-3 {
 
       <label for="f-name">Importation de transactions</label>
       <button type="importTransactions" class="importTrans-btn">Importer les transactions</button>
-  
          
 <Labelf for="status">État des synchronisations</Label>
     
 <table id="sync-table">
     <thead>
         <tr>
+            <th>Compte</th>
             <th>Pétrolière</th>
+            <th>Nom du prochain Fichier</th>
             <th>Dernière synchro</th>
             <th>Dernière transaction</th>
-            <th>Jours depuis synchro</th>
+            <th>Jours de Retard</th>
             <th>Status</th>
+            <th>Notes</th>
+            <th>Controle</th>
         </tr>
     </thead>
     <tbody>
@@ -167,6 +172,7 @@ tr.rating-3 {
 
     const state = { data: [] };
     const syncState = { data: [] };
+    const dateStr = new Date().toLocaleDateString('en-GB').replaceAll('/', '_');
 
     // Fetch ALL transactions once (small table)
     async function loadAll() {
@@ -219,10 +225,10 @@ tr.rating-3 {
         // Determine status and apply appropriate class
         let status = '';
         let cssClass = '';
-        if (r.JoursDepuisSynchro <= 7) {
+        if (r.JoursDeRetard <= 6 && r.JoursDeRetard >=0 ) {
           status = '✅ À jour';
           cssClass = 'rating-1';
-        } else if (r.JoursDepuisSynchro <= 14) {
+        } else if (r.JoursDeRetard <= 14 && r.JoursDeRetard >=0 ) {
           status = '⚠️ Vérifier';
           cssClass = 'rating-2';
         } else {
@@ -231,15 +237,100 @@ tr.rating-3 {
         }
         
         tr.className = cssClass;
+        tr.dataset.oilcoId = r.OilCoID;
+        tr.dataset.note = r.Note;
         tr.innerHTML = `
+          <td>${r.Compte ?? ''}</td>
           <td>${r.OilCoName ?? ''}</td>
+          <td>${r.OilCoName ? (r.OilCoName + '_' + dateStr) : ''}</td>
           <td>${r.DerniereSynchro.slice(0,10) ?? ''}</td>
           <td>${r.DerniereTransaction.slice(0,10) ?? ''}</td>
-          <td>${r.JoursDepuisSynchro ?? ''}</td>
+          <td>${r.JoursDeRetard ?? ''}</td>
           <td>${status}</td>
+          <td class="note-cell">${r.Note}</td>
+          <td><button class="edit-note-btn" data-oilco-id="${r.OilCoID}">Edit</button></td>
           `;
         tb.appendChild(tr);
       });
+      attachEditHandlers();
+    }
+
+    // Handle edit note functionality
+    function attachEditHandlers() {
+      const editBtns = document.querySelectorAll('.edit-note-btn');
+      editBtns.forEach(btn => {
+        btn.addEventListener('click', handleEditNote);
+      });
+    }
+
+    function handleEditNote(e) {
+      const btn = e.target;
+      const tr = btn.closest('tr');
+      const noteCell = tr.querySelector('.note-cell');
+      const oilcoId = btn.dataset.oilcoId;
+
+      // If already editing, save instead
+      if (btn.textContent === 'Save') {
+        saveNote(btn, tr, noteCell, oilcoId);
+        return;
+      }
+
+      // Enter edit mode
+      const currentNote = noteCell.textContent;
+      noteCell.innerHTML = `<textarea class="note-textarea" style="width: 100%; min-height: 60px; padding: 5px;">${currentNote}</textarea>`;
+      const textarea = noteCell.querySelector('.note-textarea');
+      textarea.focus();
+      textarea.select();
+
+      // Change button to Save
+      btn.textContent = 'Save';
+    }
+
+    async function saveNote(btn, tr, noteCell, oilcoId) {
+      const textarea = noteCell.querySelector('.note-textarea');
+      let newNote = textarea.value;
+
+      // Get username from page - extract just the text node before the role badge
+      const userInfoDiv = document.querySelector('.user-info');
+      const username = userInfoDiv.childNodes[0].textContent.trim();
+      
+      // Get current date in DD/MM/YYYY format
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-GB').replace(/\//g, '/');
+      
+      // Append username and date to note
+      const appendedText = ` - ${username} [${dateStr}]`;
+      newNote = newNote + appendedText;
+
+      try {
+        const csrf = getCookie('csrf_token');
+        const res = await fetch('/api/transactions/update-note', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          },
+          body: JSON.stringify({
+            oilcoId: parseInt(oilcoId),
+            note: newNote
+          })
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        // Update UI
+        noteCell.innerHTML = newNote;
+        btn.textContent = 'Edit';
+        alert('Note updated successfully ✅');
+      } catch (e) {
+        alert('Error updating note: ' + e.message);
+        // Revert to edit mode
+        noteCell.innerHTML = `<textarea class="note-textarea" style="width: 100%; min-height: 60px; padding: 5px;">${textarea.value}</textarea>`;
+      }
     }
 
 
