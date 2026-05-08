@@ -50,6 +50,13 @@
             gap: 5px;
         }
 
+        #tbl tr.disabled-text,
+        #tbl tr.disabled-text td,
+        .disabled-text {
+            color: #ff3b3b;
+            font-weight: 700;
+        }
+
         #changePasswordModal button, #changeUserPasswordModal button {
             padding: 8px 15px;
             cursor: pointer;
@@ -266,11 +273,15 @@
 
             rows.forEach(u => {
                 const tr = document.createElement('tr');
+                const isDisabled = u.IsDisabled === true || u.IsDisabled === 'true' || u.IsDisabled === 'Oui';
+                if (isDisabled) {
+                    tr.classList.add('disabled-text');
+                }
                 tr.innerHTML = `
                     <td>${escapeHtml(u.AppUser)}</td>
                     <td>${u.IsAdmin ? 'Oui' : 'Non'}</td>
                     <td>${u.IsSuperUser ? 'Oui' : 'Non'}</td>
-                    <td>${u.IsDisabled ? 'Oui' : 'Non'}</td>
+                    <td class="${isDisabled ? 'disabled-text' : ''}">${isDisabled ? 'Oui' : 'Non'}</td>
                     <td>
                         <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}" data-isdisabled="${u.IsDisabled}">Éditer</button>
                         <button class="btn-delete" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}">Désactivé</button>
