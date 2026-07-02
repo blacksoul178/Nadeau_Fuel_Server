@@ -12,6 +12,7 @@ type AppConfig struct {
 	Logger   LoggerCfg  `json:"logger"`
 	Database DbCfg      `json:"database"`
 	Session  SessionCfg `json:"session"`
+	Test     TestCfg    `json:"test"`
 
 	// Other configs
 }
@@ -37,6 +38,23 @@ type ServerCfg struct {
 
 type DbCfg struct {
 	Dsn string `json:"dsn"` //sql connection string
+}
+
+type TestCfg struct {
+	Server   ServerCfg `json:"server"`
+	Database DbCfg     `json:"database"`
+}
+
+func (cfg *AppConfig) ApplyTestOverrides(enabled bool) {
+	if !enabled || cfg == nil {
+		return
+	}
+	if cfg.Test.Server.Port != "" {
+		cfg.Server.Port = cfg.Test.Server.Port
+	}
+	if cfg.Test.Database.Dsn != "" {
+		cfg.Database.Dsn = cfg.Test.Database.Dsn
+	}
 }
 
 func LoadAppConfig(configPath string) (AppConfig, error) {

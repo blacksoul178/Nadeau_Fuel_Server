@@ -9,12 +9,15 @@ import (
 	"net/http"
 )
 
+var TEST = true
+
 func main() {
 	// 1- Load app configs
 	appConfig, err := config.LoadAppConfig("config.json")
 	if err != nil {
 		log.Fatalf("Error loading application configuration: %v", err)
 	}
+	appConfig.ApplyTestOverrides(TEST)
 	fmt.Println("Loaded app configs") //debug purpose
 	// 2- Init logger
 	err = logger.InitLogger(appConfig)
@@ -50,7 +53,7 @@ func main() {
 
 	logger.Info(fmt.Sprintf("Server starting on port: %s...", appConfig.Server.Port))
 	log.Printf("Serving on port: %s\n", appConfig.Server.Port)
-	if appConfig.Server.Dev == true {
+	if TEST == true {
 		log.Fatal(srv.ListenAndServeTLS("./certs/dev/dev.crt", "./certs/dev/dev.key"))
 	} else {
 		log.Fatal(srv.ListenAndServeTLS("./certs/prod/etiquette2k19.crt", "./certs/prod/etiquette2k19.key"))

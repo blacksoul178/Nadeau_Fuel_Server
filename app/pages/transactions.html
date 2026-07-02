@@ -29,32 +29,38 @@
 
 /* Colors depending on rating - applied to entire row - warm tones */
 tr.rating-1 {
-    background-color: #8dd89d; /* warm green */
-    color: #2a2a2a;
+    background-color: #8dd89d !important; /* warm green */
+    color: #2a2a2a!important;
     font-weight: 600;
 }
 tr.rating-2 {
-    background-color: #e0c09f; /* warm tan */
-    color: #2a2a2a;
+    background-color: #e0c09f !important; /* warm tan */
+    color: #2a2a2a !important;
     font-weight: 600;
 }
 tr.rating-3 {
-    background-color: #d9a8a8; /* warm rose */
-    color: #2a2a2a;
+    background-color: #d9a8a8 !important; /* warm rose */
+    color: #2a2a2a !important;
     font-weight: 600;
+}
+
+#tbl tbody tr.rating-1 td,
+#tbl tbody tr.rating-2 td,
+#tbl tbody tr.rating-3 td {
+    color: inherit !important;
 }
 
 /* Original rating classes for other tables */
 .rating-1 {
-    background-color: #8dd89d; /* warm green */
+    background-color: #8dd89d; /* green */
     font-weight: 600;
 }
 .rating-2 {
-    background-color: #e0c09f; /* warm tan */
+    background-color: #f4d35e; /* yellow */
     font-weight: 600;
 }
 .rating-3 {
-    background-color: #d9a8a8; /* warm rose */
+    background-color: #e78b8b; /* red */
     font-weight: 600;
 }
 </style>
@@ -128,7 +134,7 @@ tr.rating-3 {
             <th>Compte</th>
             <th>Pétrolière</th>
             <th>Nom du prochain Fichier</th>
-            <th>Dernière synchro</th>
+            <th>Dernière importation</th>
             <th>Dernière transaction</th>
             <th>Jours de Retard</th>
             <th>Status</th>
@@ -172,7 +178,18 @@ tr.rating-3 {
 
     const state = { data: [] };
     const syncState = { data: [] };
-    const dateStr = new Date().toLocaleDateString('en-GB').replaceAll('/', '_');
+
+    
+    function getLastSaturday() {
+        const d = new Date();
+        d.setDate(d.getDate() - ((d.getDay() + 1) % 7));
+        return d;
+    }
+
+    const lastSatDateStr = getLastSaturday()
+        .toLocaleDateString('en-GB')
+        .replaceAll('/', '_');
+
 
     // Fetch ALL transactions once (small table)
     async function loadAll() {
@@ -188,12 +205,29 @@ tr.rating-3 {
       syncState.data = await res.json();
     }
 
+    function getTransactionRowClass(r) {
+      const status = String(r.Status ?? '').trim().toUpperCase();
+      const hasFailures = Boolean(String(r.Missing ?? '').trim()) || Boolean(String(r.OtherFailures ?? '').trim());
+      const errorMessage = String(r.ErrorMessage ?? '').trim();
+
+      if (status === 'SUCCESS' || (status === 'PARTIAL'&& !hasFailures)) return 'rating-1';
+      if (hasFailures) return 'rating-3';
+      if (errorMessage === 'Fichier vide')  return 'rating-2';
+      if (errorMessage === "Incapable de lire Compte")  return 'rating-3';
+      return '';
+    }
+
     // Render transactions table
     function render(rows) {
       const tb = document.querySelector('#tbl tbody');
       tb.innerHTML = '';
       rows.forEach(r => {
         const tr = document.createElement('tr');
+        const rowClass = getTransactionRowClass(r);
+        if (rowClass) {
+          tr.className = rowClass;
+        }
+
         tr.innerHTML = `
           <td class="col-120">${r.RunName ?? ''}</td>
           <td>${r.StartedAt ?? ''}</td>
@@ -207,7 +241,7 @@ tr.rating-3 {
           <td class="wrap">${r.Missing ?? ''}</td>
           <td class="wrap">${r.OtherFailures ?? ''}</td>
           `;
-          // Add click listener to toggle selection
+        // Add click listener to toggle selection
         tr.addEventListener('click', function() {
           this.classList.toggle('selected');
         });
@@ -225,10 +259,10 @@ tr.rating-3 {
         // Determine status and apply appropriate class
         let status = '';
         let cssClass = '';
-        if (r.JoursDeRetard <= 6 && r.JoursDeRetard >=0 ) {
+        if (r.JoursDeRetard <= 6 && r.JoursDeRetard >= -10 ) {
           status = '✅ À jour';
           cssClass = 'rating-1';
-        } else if (r.JoursDeRetard <= 14 && r.JoursDeRetard >=0 ) {
+        } else if (r.JoursDeRetard <= 14 && r.JoursDeRetard >= 7 ) {
           status = '⚠️ Vérifier';
           cssClass = 'rating-2';
         } else {
@@ -242,7 +276,7 @@ tr.rating-3 {
         tr.innerHTML = `
           <td>${r.Compte ?? ''}</td>
           <td>${r.OilCoName ?? ''}</td>
-          <td>${r.OilCoName ? (r.OilCoName + '_' + dateStr) : ''}</td>
+          <td>${r.OilCoName ? (r.OilCoName + '_' + lastSatDateStr) : ''}</td>
           <td>${r.DerniereSynchro.slice(0,10) ?? ''}</td>
           <td>${r.DerniereTransaction.slice(0,10) ?? ''}</td>
           <td>${r.JoursDeRetard ?? ''}</td>
@@ -296,10 +330,10 @@ tr.rating-3 {
       
       // Get current date in DD/MM/YYYY format
       const now = new Date();
-      const dateStr = now.toLocaleDateString('en-GB').replace(/\//g, '/');
+      const currentDateStr = now.toLocaleDateString('en-GB').replace(/\//g, '/');
       
       // Append username and date to note
-      const appendedText = ` - ${username} [${dateStr}]`;
+      const appendedText = ` - ${username} [${currentDateStr}]`;
       newNote = newNote + appendedText;
 
       try {

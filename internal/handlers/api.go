@@ -90,7 +90,7 @@ SELECT run_name
       ,finished_at
       ,status
       ,error_message
-  FROM Fuel.dbo.SyncRuns
+  FROM dbo.SyncRuns
   order by started_at desc;
 `
 
@@ -278,7 +278,7 @@ SELECT
     LastName,
     Groupe,
 	isBroker
-FROM Fuel.dbo.Chauffeurs
+FROM dbo.Chauffeurs
 WHERE
     deletedDate IS NULL
     OR LTRIM(RTRIM(deletedDate)) = ''
@@ -368,7 +368,7 @@ SELECT Cardid
       ,DateReprise
       ,Active
       ,notes
-  FROM Fuel.dbo.listCartes
+  FROM dbo.listCartes
   order by FirstName;
 `
 
@@ -491,7 +491,7 @@ SELECT
     OilCoName,
 	Compte,
 	Banner
-FROM Fuel.dbo.OilCo
+FROM dbo.OilCo
 ORDER BY OilCoName;
 `
 
@@ -559,7 +559,7 @@ SELECT unitNumber
 	,NomCommunGl
 	,Propriétaire
 	,Ref
-FROM Fuel.dbo.unitListWithGL
+FROM dbo.unitListWithGL
 `
 
 	rows, err := db.QueryContext(ctx, query)
@@ -640,7 +640,7 @@ func brokersAllHandler(w http.ResponseWriter, r *http.Request) {
 	// Test query - get column info first
 	query := `
 SELECT id, Nom_Commun, Nom_Legal, Acomba
-FROM Fuel.dbo.BrokerCo
+FROM dbo.BrokerCo
 `
 
 	rows, err := db.QueryContext(ctx, query)
@@ -710,7 +710,7 @@ SELECT run_name
 	  ,duplicate_ids
 	  ,missing_card_ids
 	  ,other_failures
-  FROM Fuel.dbo.TransactionRuns
+  FROM dbo.TransactionRuns
 
   order by started_at desc;
 `
@@ -795,7 +795,7 @@ func tauxAllWeekHandler(w http.ResponseWriter, r *http.Request) {
 SELECT TOP (52)
     Annee, Semaine, PrixMoyen_AllPetro
 FROM
-fuel.dbo.v_PrixFuel_Avg_Semaine_All
+dbo.v_PrixFuel_Avg_Semaine_All
 order by Annee, Semaine desc
 `
 
@@ -860,7 +860,7 @@ SELECT TOP (52) [Annee]
       ,[Diff_Ultramar] * 100
       ,[Diff_Irving] * 100
       ,[Diff_Belisle] * 100
-  FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalSemaine]
+  FROM [dbo].[v_PrixFuel_Diff_GlobalSemaine]
   order by Annee, Semaine desc
 `
 
@@ -948,7 +948,7 @@ SELECT TOP (365) [Date]
       ,[Diff_Ultramar] * 100
       ,[Diff_Irving] * 100
       ,[Diff_Belisle] * 100
-  FROM [Fuel].[dbo].[v_PrixFuel_Diff_GlobalJour]
+  FROM [dbo].[v_PrixFuel_Diff_GlobalJour]
   order by [Date] desc
 `
 
@@ -1034,7 +1034,7 @@ SELECT TOP (1000) [Annee]
       ,[Diff_Ultramar] * 100
       ,[Diff_Irving] * 100
       ,[Diff_Belisle] * 100
-  FROM [Fuel].[dbo].[v_PrixFuel_Diff_semaine]
+  FROM [dbo].[v_PrixFuel_Diff_semaine]
   order by Annee, Semaine desc
 
 `
@@ -1128,7 +1128,7 @@ SELECT TOP (1000) [Date]
       ,[Diff_Ultramar] * 100
       ,[Diff_Irving] * 100
       ,[Diff_Belisle] * 100
-  FROM [Fuel].[dbo].[v_PrixFuel_Diff_Jour]
+  FROM [dbo].[v_PrixFuel_Diff_Jour]
   Order by [date] desc
 `
 
@@ -1218,7 +1218,7 @@ SELECT TOP (1000) [Annee]
       ,[Diff_Ultramar] * 100
       ,[Diff_Irving] * 100
       ,[Diff_Belisle] * 100
-  FROM [Fuel].[dbo].[v_PrixFuel_DiffRegionSemaine]
+  FROM [dbo].[v_PrixFuel_DiffRegionSemaine]
   order by Annee desc, Semaine desc, Region asc;
 `
 
@@ -1311,7 +1311,7 @@ SELECT TOP (1000) [Date]
       ,[Diff_Ultramar] * 100
       ,[Diff_Irving] * 100
       ,[Diff_Belisle] * 100
-  FROM [Fuel].[dbo].[v_PrixFuel_DiffRegionJour]
+  FROM [dbo].[v_PrixFuel_DiffRegionJour]
   order by [date] desc, Region asc;
 `
 
@@ -1397,7 +1397,7 @@ SELECT [Annee]
       ,[Petroliere]
       ,[Ville]
       ,[PrixMoyen]
-  FROM [Fuel].[dbo].[v_PrixFuel_semaine]
+  FROM [dbo].[v_PrixFuel_semaine]
   order by Annee, Semaine desc;
 `
 
@@ -1470,7 +1470,7 @@ SELECT [Date]
       ,[Petroliere]
       ,[Ville]
       ,[PrixMoyen]
-  FROM [Fuel].[dbo].[v_PrixFuel_Jour]
+  FROM [dbo].[v_PrixFuel_Jour]
   order by [Date] Desc;
 `
 
@@ -1540,7 +1540,7 @@ SELECT TOP (1000) [Annee]
       ,[Region]
       ,[Petroliere]
       ,[PrixMoyen]
-  FROM [Fuel].[dbo].[v_PrixFuel_RegionSemaine]
+  FROM [dbo].[v_PrixFuel_RegionSemaine]
   order by Annee desc, Semaine desc, Region asc;
 `
 
@@ -1613,7 +1613,7 @@ SELECT TOP (1000) [Date]
       ,[Region]
       ,[Petroliere]
       ,[PrixMoyen]
-  FROM [Fuel].[dbo].[v_PrixFuel_RegionJour]
+  FROM [dbo].[v_PrixFuel_RegionJour]
   order by [Date] desc, Region asc
 `
 
@@ -1685,7 +1685,7 @@ func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 		DerniereTransaction,
 		JoursDeRetard,
 		Note
-	FROM Fuel.dbo.DerniereSynchroComplete
+	FROM dbo.DerniereSynchroComplete
 	where OilCoName != 'Traversiers'
 	ORDER BY FK_OilCoId ASC
 	`
@@ -1779,7 +1779,7 @@ func updateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	query := `
-	UPDATE Fuel.dbo.OilCo
+	UPDATE dbo.OilCo
 	SET note = @note
 	WHERE id = @id
 	`
@@ -1821,7 +1821,7 @@ func villesAllHandler(w http.ResponseWriter, r *http.Request) {
 	SELECT 
 	SupplierCity, NormalizedCity, Region,
 	LastUpdatedBy, LastUpdatedDate
-	FROM Fuel.dbo.CityNormalization
+	FROM dbo.CityNormalization
 	ORDER BY
     CASE WHEN NormalizedCity IS NULL THEN 0 ELSE 1 END,  -- NULLs first
     LastUpdatedDate DESC;
@@ -1888,7 +1888,7 @@ func petitsVehiculesAllHandler(w http.ResponseWriter, r *http.Request) {
 	query := `
 	SELECT 
 	id, operatorNo, FirstName, FK_DispatchGroup,startDate, deletedDate, isBroker
-	from fuel.dbo.Drivers where petitVehicule = 1;
+	from dbo.Drivers where petitVehicule = 1;
 	`
 
 	rows, err := db.QueryContext(ctx, query)
@@ -1957,7 +1957,8 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 	// Test query - get column info first
 	query := `
 	SELECT 
-	[Date], ULSDQC1, ULSD1 from Fuel.Dbo.valeroRackPrice;
+	[Date], ULSDQC1, ULSD1 from dbo.valeroRackPrice
+	order by [date] desc;
 	`
 
 	rows, err := db.QueryContext(ctx, query)
@@ -2205,7 +2206,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 	// Resolve driverName -> Drivers.id using FirstName + ' ' + LastName (or just FirstName for petit vehicule drivers)
 	var driverId sql.NullInt64
 	if err := tx.QueryRowContext(ctx, `
-		SELECT id FROM Fuel.dbo.Drivers 
+		SELECT id FROM dbo.Drivers 
 		WHERE LTRIM(RTRIM(FirstName + ' ' + ISNULL(LastName, ''))) = @name
 		   OR FirstName = @name
 	`, sql.Named("name", strings.TrimSpace(body.DriverName))).Scan(&driverId); err != nil {
@@ -2224,7 +2225,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 		oc := strings.TrimSpace(*body.OilCoName)
 		if oc != "" {
 			var oilCoId sql.NullInt64
-			if err := tx.QueryRowContext(ctx, `SELECT id FROM Fuel.dbo.OilCo WHERE OilCoName = @name`, sql.Named("name", oc)).Scan(&oilCoId); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT id FROM dbo.OilCo WHERE OilCoName = @name`, sql.Named("name", oc)).Scan(&oilCoId); err != nil {
 				if err == sql.ErrNoRows {
 					respondWithError(w, http.StatusBadRequest, "oil company not found")
 					return
@@ -2284,7 +2285,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 
 	insertQ := `
 SET NOCOUNT ON;
-INSERT INTO Fuel.dbo.Cartes (FK_DriverId, CardNumber, NIP, FK_OilCoId, Expiration, DateRemise, DateReprise, Notes)
+INSERT INTO dbo.Cartes (FK_DriverId, CardNumber, NIP, FK_OilCoId, Expiration, DateRemise, DateReprise, Notes)
 OUTPUT INSERTED.CardId
 VALUES (@driverId, @cardNumber, @nip, @oilCoId, TRY_CONVERT(date, @expiration, 120), TRY_CONVERT(date, @dr, 120), NULL, @notes);
 `
@@ -2402,9 +2403,9 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Update assumed table Fuel.dbo.Cards (adjust if necessary)
+	// Update assumed table dbo.Cards (adjust if necessary)
 	updateQ := `
-UPDATE Fuel.dbo.Cartes
+UPDATE dbo.Cartes
 SET NIP = @nip,
 	DateRemise = TRY_CONVERT(date, @dr, 120),
 	DateReprise = TRY_CONVERT(date, @dre, 120),
@@ -2573,7 +2574,7 @@ func cartesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	selQ := `
 SELECT CardId, FirstName, LastName, CardNumber, NIP, Expiration, OilCoName, DateRemise, DateReprise, Active, notes
-FROM Fuel.dbo.listCartes
+FROM dbo.listCartes
 WHERE CardId = @cid
 `
 	if err := tx.QueryRowContext(ctx, selQ, sql.Named("cid", body.CardId)).Scan(
@@ -2619,7 +2620,7 @@ WHERE CardId = @cid
 	}
 
 	// Attempt physical delete from table
-	delQ := `DELETE FROM Fuel.dbo.Cartes WHERE CardId = @cid AND CardNumber = @cn;`
+	delQ := `DELETE FROM dbo.Cartes WHERE CardId = @cid AND CardNumber = @cn;`
 	if res, err := tx.ExecContext(ctx, delQ, sql.Named("cid", body.CardId), sql.Named("cn", body.CardNumber)); err != nil {
 		logger.Info("Exec error on cartesDeleteHandler: " + err.Error())
 		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
@@ -2730,7 +2731,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 
 	// Verify broker exists
 	var existingName sql.NullString
-	if err := tx.QueryRowContext(ctx, `SELECT Nom_Commun FROM Fuel.dbo.BrokerCo WHERE id = @id`, sql.Named("id", body.BrokerId)).Scan(&existingName); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT Nom_Commun FROM dbo.BrokerCo WHERE id = @id`, sql.Named("id", body.BrokerId)).Scan(&existingName); err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusBadRequest, "broker not found")
 			return
@@ -2744,7 +2745,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	var maxSuffix sql.NullInt64
 	// Use TRY_CAST to safely convert LastName to int; unsupported DB will return NULL and ISNULL will give 0
 	if err := tx.QueryRowContext(ctx, `
-		SELECT ISNULL(MAX(TRY_CAST(LastName AS INT)), 0) FROM Fuel.dbo.Drivers WHERE FirstName = @fname
+		SELECT ISNULL(MAX(TRY_CAST(LastName AS INT)), 0) FROM dbo.Drivers WHERE FirstName = @fname
 	`, sql.Named("fname", body.BrokerName)).Scan(&maxSuffix); err != nil {
 		logger.Info("Query error on brokersAddDriver (max suffix): " + err.Error())
 		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
@@ -2761,7 +2762,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 	// Insert driver and return new ID using OUTPUT
 	insertQ := `
 	SET NOCOUNT ON;
-	INSERT INTO Fuel.dbo.Drivers (operatorNo, FirstName, LastName, FK_DispatchGroup, startDate, deletedDate, isBroker, FK_BrokerId)
+	INSERT INTO dbo.Drivers (operatorNo, FirstName, LastName, FK_DispatchGroup, startDate, deletedDate, isBroker, FK_BrokerId)
 	OUTPUT INSERTED.id
 	VALUES (@operatorNo, @FirstName, @LastName, @FK_DispatchGroup, @startDate, @deletedDate, @isBroker, @FK_BrokerId);
 	`
@@ -2785,7 +2786,7 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 
 	// Verify insertion
 	var verifyId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.Drivers WHERE operatorNo = @op AND FK_BrokerId = @bid ORDER BY id DESC`, sql.Named("op", operatorNo), sql.Named("bid", body.BrokerId)).Scan(&verifyId); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM dbo.Drivers WHERE operatorNo = @op AND FK_BrokerId = @bid ORDER BY id DESC`, sql.Named("op", operatorNo), sql.Named("bid", body.BrokerId)).Scan(&verifyId); err != nil {
 		if err == sql.ErrNoRows {
 			logger.Info("Verification select: no rows found after insert for operatorNo=" + operatorNo)
 		} else {
@@ -2898,7 +2899,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 	// Insert driver and return new ID using OUTPUT
 	insertQ := `
 	SET NOCOUNT ON;
-	INSERT INTO Fuel.dbo.BrokerCo (Nom_Legal, Nom_Commun, Acomba)
+	INSERT INTO dbo.BrokerCo (Nom_Legal, Nom_Commun, Acomba)
 	OUTPUT INSERTED.id
 	VALUES (@Nom_Legal, @Nom_Commun, @Acomba);
 	`
@@ -2917,7 +2918,7 @@ func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 
 	// Verify insertion
 	var verifyId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.BrokerCo WHERE Nom_Legal = @nl and Nom_Commun = @nc and Acomba = @A`, sql.Named("nl", body.BrokerCoLegalName), sql.Named("nc", body.BrokerCoCommonName), sql.Named("A", body.BrokerCoAcomba)).Scan(&verifyId); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM dbo.BrokerCo WHERE Nom_Legal = @nl and Nom_Commun = @nc and Acomba = @A`, sql.Named("nl", body.BrokerCoLegalName), sql.Named("nc", body.BrokerCoCommonName), sql.Named("A", body.BrokerCoAcomba)).Scan(&verifyId); err != nil {
 		if err == sql.ErrNoRows {
 			logger.Info("Verification select: no rows found after insert for Nom_Commun" + body.BrokerCoCommonName)
 		} else {
@@ -3091,7 +3092,7 @@ func usersDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deleteQ := `update fuel.dbo.AppUser
+	deleteQ := `update dbo.AppUser
 	set IsDisabled = 1 
 	WHERE id = @id`
 
@@ -3352,7 +3353,7 @@ func villesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	updateQ := `UPDATE Fuel.dbo.CityNormalization 
+	updateQ := `UPDATE dbo.CityNormalization 
 	SET 
 	NormalizedCity = @NormalizedCity,
 	Region = @Region,
@@ -3468,7 +3469,7 @@ func petitsVehiculesAddDriver(w http.ResponseWriter, r *http.Request) {
 	// Insert driver and return new ID using OUTPUT
 	insertQ := `
 	SET NOCOUNT ON;
-	INSERT INTO Fuel.dbo.Drivers (operatorNo, FirstName, FK_DispatchGroup, startDate, deletedDate, petitVehicule, isBroker, FK_BrokerId)
+	INSERT INTO dbo.Drivers (operatorNo, FirstName, FK_DispatchGroup, startDate, deletedDate, petitVehicule, isBroker, FK_BrokerId)
 	OUTPUT INSERTED.id
 	VALUES (@operatorNo, @FirstName, @FK_DispatchGroup, @startDate, @deletedDate, 1, @isBroker, @FK_BrokerId);
 	`
@@ -3500,7 +3501,7 @@ func petitsVehiculesAddDriver(w http.ResponseWriter, r *http.Request) {
 
 	// Verify insertion
 	var verifyId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.Drivers WHERE FirstName = @FirstName AND petitVehicule = 1 ORDER BY id DESC`, sql.Named("FirstName", body.FirstName)).Scan(&verifyId); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM dbo.Drivers WHERE FirstName = @FirstName AND petitVehicule = 1 ORDER BY id DESC`, sql.Named("FirstName", body.FirstName)).Scan(&verifyId); err != nil {
 		if err == sql.ErrNoRows {
 			logger.Info("Verification select: no rows found after insert for FirstName=" + body.FirstName)
 		} else {
@@ -3528,8 +3529,8 @@ func petitsVehiculesAddDriver(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, http.StatusOK, res)
 }
-func petrolieresNotesUpdate(w http.ResponseWriter, r *http.Request){
-	
+func petrolieresNotesUpdate(w http.ResponseWriter, r *http.Request) {
+
 }
 
 // petrolieresAddOilCoHandler - Add a new OilCo (Pétrolière)
@@ -3618,7 +3619,7 @@ func petrolieresAddOilCoHandler(w http.ResponseWriter, r *http.Request) {
 	// Insert OilCo and return new ID using OUTPUT
 	insertQ := `
 	SET NOCOUNT ON;
-	INSERT INTO Fuel.dbo.OilCo (OilCoName, Compte, Banner)
+	INSERT INTO dbo.OilCo (OilCoName, Compte, Banner)
 	OUTPUT INSERTED.id
 	VALUES (@OilCoName, @Compte, @Banner);
 	`
@@ -3637,7 +3638,7 @@ func petrolieresAddOilCoHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Verify insertion
 	var verifyId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM Fuel.dbo.OilCo WHERE OilCoName = @OilCoName ORDER BY id DESC`, sql.Named("OilCoName", body.OilCoName)).Scan(&verifyId); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM dbo.OilCo WHERE OilCoName = @OilCoName ORDER BY id DESC`, sql.Named("OilCoName", body.OilCoName)).Scan(&verifyId); err != nil {
 		if err == sql.ErrNoRows {
 			logger.Info("Verification select: no rows found after insert for OilCoName=" + body.OilCoName)
 		} else {
@@ -3746,7 +3747,7 @@ func petitsVehiculesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Update driver dates - use TRY_CONVERT to handle date format conversion
 	updateQ := `
-UPDATE Fuel.dbo.Drivers
+UPDATE dbo.Drivers
 SET startDate = TRY_CONVERT(date, @startDate, 120),
 	deletedDate = TRY_CONVERT(date, @deletedDate, 120)
 WHERE id = @driverId AND petitVehicule = 1;
