@@ -1,0 +1,28 @@
+{{define "header"}}
+<header>
+        <div>
+            <h1>Fuel'O'Matic Nadeau</h1>
+        </div>
+        <div class="user-info">
+            {{.Username}}
+            <span class="role-badge {{.Role}}">{{.Role}}</span>
+        <form action="/logout" method="POST">
+        <!-- CSRF Token for logout -->
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+        <button type="submit" class="logout-btn">Logout</button>
+        </div>
+    </form>
+</header>
+<br>
+
+<section id="content">
+        {{if .IsAdmin}}
+        <div class="admin-section">
+            {{template "adminNav" .}}
+        </div>
+        {{end}}
+        <h4>Navigation</h4>
+        
+{{template "pageTabs" .}}
+</section>
+{{end}}

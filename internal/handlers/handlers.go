@@ -584,7 +584,7 @@ func villesHandler(w http.ResponseWriter, r *http.Request) {
 
 	_ = tplVilles.Execute(w, data)
 }
-func petitsVehiculesHandler(w http.ResponseWriter, r *http.Request) {
+func cartesPretHandler(w http.ResponseWriter, r *http.Request) {
 	session := GetSessionInfo(r)
 	if session == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -609,7 +609,7 @@ func petitsVehiculesHandler(w http.ResponseWriter, r *http.Request) {
 		"CSRFToken":   token,
 	}
 
-	_ = tplPetitsVehicules.Execute(w, data)
+	_ = tplCartesPret.Execute(w, data)
 }
 func rampeHandler(w http.ResponseWriter, r *http.Request) {
 	session := GetSessionInfo(r)

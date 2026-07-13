@@ -14,24 +14,41 @@ import (
 
 const filepathRoot = "app"
 
-var tplLogin = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "login.html")))
-var tplHome = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "home.html")))
-var tplChauffeurs = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "chauffeurs.html")))
-var tplCartes = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "cartes.html")))
-var tplTransactions = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "transactions.html")))
-var tplPetrolieres = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "petrolieres.html")))
-var tplVehicules = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "vehicules.html")))
-var tplBrokers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "brokers.html")))
-var tplSyncruns = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "syncruns.html")))
-var tplLogs = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "logs.html")))
-var tplUsers = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "users.html")))
-var tplTaux = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "taux.html")))
-var tplPrixFuel = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "prixFuel.html")))
-var tplVilles = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "villes.html")))
-var tplPetitsVehicules = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "petitsVehicules.html")))
-var tplRampe = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "rampe.html")))
-var tplPeages = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "peages.html")))
-var tplCamionsBroker = template.Must(template.ParseFiles(filepath.Join(filepathRoot, "pages", "camionsBroker.html")))
+func parsePageTemplate(pageFile string) *template.Template {
+	partialsPattern := filepath.Join(filepathRoot, "pages", "partials", "*.html")
+	partialFiles, err := filepath.Glob(partialsPattern)
+	if err != nil {
+		panic(err)
+	}
+	pagePath := filepath.Join(filepathRoot, "pages", pageFile)
+	templateName := filepath.Base(pagePath)
+	files := append(partialFiles, pagePath)
+	return template.Must(template.New(templateName).ParseFiles(files...))
+}
+
+// ADMIN
+var tplSyncruns = parsePageTemplate("syncruns.html")
+var tplLogs = parsePageTemplate("logs.html")
+var tplUsers = parsePageTemplate("users.html")
+
+// tous
+var tplLogin = parsePageTemplate("login.html")
+var tplHome = parsePageTemplate("home.html")
+var tplChauffeurs = parsePageTemplate("chauffeurs.html")
+var tplCartes = parsePageTemplate("cartes.html")
+var tplBrokers = parsePageTemplate("brokers.html")
+var tplVehicules = parsePageTemplate("vehicules.html")
+var tplTaux = parsePageTemplate("taux.html")
+var tplPeages = parsePageTemplate("peages.html")
+var tplCamionsBroker = parsePageTemplate("camionsBroker.html")
+
+// super user
+var tplTransactions = parsePageTemplate("transactions.html")
+var tplPetrolieres = parsePageTemplate("petrolieres.html")
+var tplPrixFuel = parsePageTemplate("prixFuel.html")
+var tplVilles = parsePageTemplate("villes.html")
+var tplRampe = parsePageTemplate("rampe.html")
+var tplCartesPret = parsePageTemplate("cartesPret.html")
 
 var db *sql.DB
 
@@ -43,24 +60,26 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	assets := http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(filepathRoot, "assets"))))
 	mux.Handle("/assets/", assets)
 
-	//page routes
+	//all user pages routes
 	mux.HandleFunc("GET /health", Health)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logOutHandler)
 	mux.HandleFunc("/home", requireLogin(homeHandler))
 	mux.HandleFunc("/chauffeurs", requireLogin(chauffeursHandler))
 	mux.HandleFunc("/cartes", requireLogin(cartesHandler))
+	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
+	mux.HandleFunc("/vehicules", requireLogin(vehiculesHandler))
+	mux.HandleFunc("/taux", requireLogin(tauxHandler))
+	//Super User pages routes
 	mux.HandleFunc("/transactions", requireLogin(transactionsHandler))
 	mux.HandleFunc("/petrolieres", requireLogin(petrolieresHandler))
-	mux.HandleFunc("/vehicules", requireLogin(vehiculesHandler))
-	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
-	mux.HandleFunc("/taux", requireLogin(tauxHandler))
 	mux.HandleFunc("/prixFuel", requireLogin(prixFuelHandler))
 	mux.HandleFunc("/villes", requireLogin(villesHandler))
-	mux.HandleFunc("/peages", requireLogin(peagesHandler))
-	mux.HandleFunc("/camionsBroker", requireLogin(camionsBrokerHandler))
-	// mux.HandleFunc("/petitsVehicules", requireLogin(petitsVehiculesHandler))
 	mux.HandleFunc("/rampe", requireLogin(rampeHandler))
+	mux.HandleFunc("/cartesPret", requireLogin(cartesPretHandler))
+	//TODO   mux.HandleFunc("/peages", requireLogin(peagesHandler))
+	// Dont remember what this is mux.HandleFunc("/camionsBroker", requireLogin(camionsBrokerHandler))
+	//admin pages routes
 	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
 	mux.HandleFunc("/admin/logs", requireLogin(logsHandler))
 	mux.HandleFunc("/admin/users", requireLogin(usersHandler))
@@ -68,15 +87,19 @@ func App(mux *http.ServeMux, database *sql.DB) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
 
-	//Get API
+	//Get API ALL USERS
 	mux.Handle("GET /api/chauffeurs/all", requireLogin(http.HandlerFunc(chauffeursAllHandler)))
-	mux.Handle("GET /api/petrolieres/all", requireLogin(http.HandlerFunc(petrolieresAllHandler)))
-	mux.Handle("GET /api/vehicules/all", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
-	mux.Handle("GET /api/brokers/all", requireLogin(http.HandlerFunc(brokersAllHandler)))
+	mux.Handle("GET /api/chauffeurs/pret", requireLogin(http.HandlerFunc(chauffeursPretHandler)))
 	mux.Handle("GET /api/cartes/all", requireLogin(http.HandlerFunc(cartesAllHandler)))
+	mux.Handle("GET /api/cartesPret/all", requireLogin(http.HandlerFunc(cartesPretAllHandler)))
+	mux.Handle("GET /api/brokers/all", requireLogin(http.HandlerFunc(brokersAllHandler)))
+	mux.Handle("GET /api/vehicules/all", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
+	mux.Handle("GET /api/taux/allWeek", requireLogin(http.HandlerFunc(tauxAllWeekHandler)))
+
+	//Get API Super Users
 	mux.Handle("GET /api/transactions/all", requireLogin(http.HandlerFunc(transactionsAllHandler)))
 	mux.Handle("GET /api/transactions/sync-status", requireLogin(http.HandlerFunc(syncStatusHandler)))
-	mux.Handle("GET /api/taux/allWeek", requireLogin(http.HandlerFunc(tauxAllWeekHandler)))
+	mux.Handle("GET /api/petrolieres/all", requireLogin(http.HandlerFunc(petrolieresAllHandler)))
 	mux.Handle("GET /api/prixFuel/globalJour", requireLogin(http.HandlerFunc(prixFuelGlobalJourHandler)))
 	mux.Handle("GET /api/prixFuel/globalSemaine", requireLogin(http.HandlerFunc(prixFuelGlobalSemaineHandler)))
 	mux.Handle("GET /api/prixFuel/diffJour", requireLogin(http.HandlerFunc(prixFuelDiffJourHandler)))
@@ -88,22 +111,23 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("GET /api/prixFuel/regionSemaine", requireLogin(http.HandlerFunc(prixFuelRegionSemaineHandler)))
 	mux.Handle("GET /api/prixFuel/semaine", requireLogin(http.HandlerFunc(prixFuelSemaineHandler)))
 	mux.Handle("GET /api/villes/all", requireLogin(http.HandlerFunc(villesAllHandler)))
-	// mux.Handle("GET /api/petitsVehicules/all", requireLogin(http.HandlerFunc(petitsVehiculesAllHandler)))
 	mux.Handle("GET /api/rampe/all", requireLogin(http.HandlerFunc(rampeAllHandler)))
-	mux.Handle("GET /api/peages/all", requireLogin(http.HandlerFunc(peagesAllHandler)))
-	mux.Handle("GET /api/camionsBroker/all", requireLogin(http.HandlerFunc(camionsBrokerAllHandler)))
+	// TODO   mux.Handle("GET /api/peages/all", requireLogin(http.HandlerFunc(peagesAllHandler)))
+	//mux.Handle("GET /api/camionsBroker/all", requireLogin(http.HandlerFunc(camionsBrokerAllHandler)))
 
-	//Post API
-	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver))) //Adding broker drivers
-	mux.Handle("POST /api/brokerCo/add", requireLogin(http.HandlerFunc(brokersAddCo)))
+	//Post API ALL USERS
 	mux.Handle("POST /api/cartes/add", requireLogin(http.HandlerFunc(cartesAddHandler)))
 	mux.Handle("POST /api/cartes/update", requireLogin(http.HandlerFunc(cartesUpdateHandler)))
+	mux.Handle("POST /api/drivers/add", requireLogin(http.HandlerFunc(brokersAddDriver))) //Adding broker drivers
+	// Update driver dispatch group
+	mux.Handle("POST /api/drivers/update-group", requireLogin(http.HandlerFunc(driversUpdateGroupHandler)))
+
+	//POST API Super USers
 	mux.Handle("POST /api/cartes/delete", requireLogin(http.HandlerFunc(cartesDeleteHandler)))
-	mux.Handle("POST /api/villes/update", requireLogin(http.HandlerFunc(villesUpdateHandler)))
-	// mux.Handle("POST /api/petitsVehicules/addDriver", requireLogin(http.HandlerFunc(petitsVehiculesAddDriver)))
-	// mux.Handle("POST /api/petitsVehicules/update", requireLogin(http.HandlerFunc(petitsVehiculesUpdateHandler)))
-	mux.Handle("POST /api/petrolieres/addOilCo", requireLogin(http.HandlerFunc(petrolieresAddOilCoHandler)))
+	mux.Handle("POST /api/brokerCo/add", requireLogin(http.HandlerFunc(brokersAddCo)))
 	mux.Handle("POST /api/transactions/update-note", requireLogin(http.HandlerFunc(updateNoteHandler)))
+	mux.Handle("POST /api/petrolieres/addOilCo", requireLogin(http.HandlerFunc(petrolieresAddOilCoHandler)))
+	mux.Handle("POST /api/villes/update", requireLogin(http.HandlerFunc(villesUpdateHandler)))
 
 	// local scripts
 	mux.Handle("POST /api/drivers/sync", requireLogin(http.HandlerFunc(syncDriversHandler)))

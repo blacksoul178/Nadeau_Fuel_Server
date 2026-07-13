@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{.CSRFToken}}">
-    <title>Fuel'O'Matic - Cartes</title>
+    <title>Fuel'O'Matic - Cartes de prêt</title>
     <link rel="stylesheet" href="/assets/style.css">
     
 </head>
@@ -13,7 +13,7 @@
 
 
 <main class="container">
-    <!-- Ajout de Cartes -->
+  Ajout de Cartes 
     <section class="panel">
             <label for="Ajout de carte">Ajout de carte</label>
             <div>
@@ -47,7 +47,7 @@
     <button type="submit" class="AjouterCarte">Ajouter</button>
 </section>
   </main>
-  
+
 
   
 <main class="container">
@@ -81,7 +81,6 @@
         <option value="TMC">TMC</option>
         <option value="GJF">GJF</option>
         <option value="MTA">MTA</option>
-        <option value="9001">9001</option>
       </select>
       </div>
       <div class="spacer"></div>
@@ -135,7 +134,7 @@
       list.innerHTML = '';
 
       // Collect unique names and sort
-      const names = Array.from(new Set((drivers || []).map(d => (d.Nom || '').trim()).filter(n => n)));
+      const names = Array.from(new Set((drivers || []).map(d => (d.operatorNo || '').trim()).filter(n => n)));
       names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
       for (const name of names) {
         const opt = document.createElement('option');
@@ -152,6 +151,22 @@
         if (!res.ok) return;
         const list = await res.json();
         const dl = document.getElementById('oilCoList');
+        if (!dl) return;
+        dl.innerHTML = '';
+        const names = Array.from(new Set((list || []).map(i => (i.OilCoName || '').trim()).filter(n => n)));
+        names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+        for (const name of names) {
+          const opt = document.createElement('option'); opt.value = name; dl.appendChild(opt);
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    async function populateDispatchGroupList() {
+      try {
+        const res = await fetch('/api/DispatchGroup/all', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const list = await res.json();
+        const dl = document.getElementById('DispatchGroupList');
         if (!dl) return;
         dl.innerHTML = '';
         const names = Array.from(new Set((list || []).map(i => (i.OilCoName || '').trim()).filter(n => n)));
@@ -178,6 +193,9 @@
       textarea.style.height = textarea.scrollHeight + 'px';
     }
 
+    // Mapping from group name to DB id
+    const dispatchGroupNameToId = {None:0, TGN: 1, TMC: 2, MTA: 4, GJF: 5, '9001': 6  };
+
     function attachEnterSubmitToRowInputs(row) {
       if (!row) return;
       const btn = row.querySelector('.btn-edit[data-editing="1"]');
@@ -186,12 +204,12 @@
         if (event.key !== 'Enter' || event.shiftKey) return;
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
-        if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes')) return;
+        if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes, .inp-group')) return;
         event.preventDefault();
         btn.click();
       };
       row._enterSubmitHandler = handler;
-      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes'].forEach(selector => {
+      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes', '.inp-group'].forEach(selector => {
         row.querySelectorAll(selector).forEach(el => el.addEventListener('keydown', handler));
       });
     }
@@ -199,7 +217,7 @@
     function detachEnterSubmitFromRow(row) {
       if (!row || !row._enterSubmitHandler) return;
       const handler = row._enterSubmitHandler;
-      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes'].forEach(selector => {
+      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes', '.inp-group'].forEach(selector => {
         row.querySelectorAll(selector).forEach(el => el.removeEventListener('keydown', handler));
       });
       delete row._enterSubmitHandler;
@@ -208,9 +226,9 @@
     function attachGlobalEnterSubmitHandler() {
       document.body.addEventListener('keydown', event => {
         if (event.key !== 'Enter' || event.shiftKey) return;
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) return;
-        if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes')) return;
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes, .inp-group')) return;
         const row = target.closest('tr');
         if (!row) return;
         const btn = row.querySelector('.btn-edit[data-editing="1"]');
@@ -223,14 +241,14 @@
 
     // Fetch ALL once (small table)
     async function loadAll() {
-      const res = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/cartesPret/all', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       
 
       state.data = await res.json();
       // Fetch driver names from /api/chauffeurs/all for the datalist
       try {
-        const driversRes = await fetch('/api/chauffeurs/all', { headers: { 'Accept': 'application/json' } });
+        const driversRes = await fetch('/api/chauffeurs/pret', { headers: { 'Accept': 'application/json' } });
         if (driversRes.ok) {
           const drivers = await driversRes.json();
           populateDriverNameSelect(drivers);
@@ -427,6 +445,22 @@
                   if (dreCell) {
                     dreCell.parentElement.innerHTML = `<input class="inp-dre" type="date" autocomplete="off" value="${dreValDate}">`;
                   }
+                  // Make Groupe editable in cartesPret only
+                  const grpCell = row.querySelector('td:nth-child(2)');
+                  if (grpCell) {
+                    const cur = (grpCell.textContent || '').trim();
+                    const sel = document.createElement('select');
+                    sel.className = 'inp-group';
+                    sel.autocomplete = 'off';
+                    ['','TGN','TMC','GJF','MTA','9001'].forEach(g => {
+                      const o = document.createElement('option'); o.value = g; o.textContent = g || '';
+                      if (g === cur) o.selected = true; sel.appendChild(o);
+                    });
+                    // store original group
+                    row._origGroup = cur;
+                    grpCell.innerHTML = '';
+                    grpCell.appendChild(sel);
+                  }
                   if (notesCell) {
                     const textarea = document.createElement('textarea');
                     textarea.className = 'inp-notes';
@@ -449,6 +483,8 @@
                   detachEnterSubmitFromRow(row);
                   // save
                   const nip = row.querySelector('.inp-nip')?.value.trim() || '';
+                  const newGroup = row.querySelector('.inp-group')?.value || '';
+                  const operatorNo = (row.querySelector('td')?.textContent || '').trim();
                   let drRaw = row.querySelector('.inp-dr')?.value;
                   let dreRaw = row.querySelector('.inp-dre')?.value;
                   let dr = drRaw == null ? null : drRaw.trim();
@@ -460,6 +496,23 @@
                   let notes = notesRaw == null ? null : notesRaw.trim();
                   if (notes === '') notes = null;
 
+                  // If group changed, update driver first
+                  try {
+                    const origGroup = row._origGroup || '';
+                    if (newGroup !== origGroup) {
+                      const dgId = dispatchGroupNameToId[newGroup] || 0;
+                      if (dgId <= 0) throw new Error('Groupe invalide');
+                      const resDriver = await fetch('/api/drivers/update-group', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+                        body: JSON.stringify({ operatorNo: operatorNo, dispatchGroup: dgId })
+                      });
+                      if (!resDriver.ok) { const txt = await resDriver.text(); throw new Error('driver update failed: ' + (txt || resDriver.statusText)); }
+                    }
+                  } catch (drvErr) {
+                    alert('Erreur mise à jour chauffeur: ' + drvErr.message);
+                    return;
+                  }
                   try {
                     const res = await fetch('/api/cartes/update', {
                       method: 'POST',
@@ -471,7 +524,7 @@
                     }
                     // Fetch updated data for this card and re-render row
                     try {
-                      const carteRes = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
+                      const carteRes = await fetch('/api/cartesPret/all', { headers: { 'Accept': 'application/json' } });
                       if (carteRes.ok) {
                         const allCartes = await carteRes.json();
                         const updatedCarte = allCartes.find(c => c.CardId === Number(cardId));
@@ -597,8 +650,9 @@
         applyFilter();
         setupRowSelection();
         attachGlobalEnterSubmitHandler();
-        // populate oil company list
+        // populate oil company and dispatch group list
         populateOilCoList();
+        populateDispatchGroupList();
         // Ajouter carte button handler
         const addBtn = document.querySelector('.AjouterCarte');
         if (addBtn) addBtn.addEventListener('click', async function (e) {

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -17,6 +18,12 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+//tools functions
+
+func round2(v float64) float64 { //round to 2 decimals
+	return math.Round(v*100) / 100
+}
 
 type User struct {
 	ID          int
@@ -344,6 +351,70 @@ ORDER BY FirstName;
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
+func chauffeursPretHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+select operatorNo, Groupe
+FROM dbo.chauffeurs d
+WHERE d.pret = 1
+        AND NOT EXISTS (
+            SELECT 1
+            FROM dbo.Cartes c
+            WHERE c.fk_driverId = d.id
+        )
+
+
+ORDER BY FirstName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on chauffeursPretHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		OperatorNo string `json:"operatorNo"`
+		Groupe     string `json:"Groupe"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			opNo sql.NullString
+			grp  sql.NullString
+		)
+		if err := rows.Scan(&opNo, &grp); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on chauffeursPretHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			OperatorNo: opNo.String,
+			Groupe:     grp.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on chauffeursPretHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
 func cartesAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -470,6 +541,139 @@ SELECT Cardid
 	if err := rows.Err(); err != nil {
 		http.Error(w, "rows error: "+err.Error(), 500)
 		logger.Info("Rows error on cartesAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func cartesPretAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT Cardid
+      ,FirstName
+      ,LastName
+      ,isBroker
+      ,Nom_DispatchGroup
+      ,CardNumber
+      ,NIP
+      ,Expiration
+	  ,OilCoName
+      ,DateRemise
+      ,DateReprise
+      ,Active
+      ,notes
+  FROM dbo.listCartes
+  where pret = 1
+  order by FirstName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on cartesPretAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		CardId            int    `json:"CardId"`
+		Nom               string `json:"Nom"`
+		IsBroker          bool   `json:"IsBroker"`
+		Nom_DispatchGroup string `json:"Nom_DispatchGroup"`
+		CardNumber        string `json:"CardNumber"`
+		NIP               string `json:"NIP"`
+		Expiration        string `json:"Expiration"`
+		OilCoName         string `json:"OilCoName"`
+		DateRemise        string `json:"DateRemise"`
+		DateReprise       string `json:"DateReprise"`
+		Active            bool   `json:"Active"`
+		Notes             string `json:"Notes"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			CardId            sql.NullInt32
+			FirstName         sql.NullString
+			LastName          sql.NullString
+			IsBroker          sql.NullBool
+			Nom_DispatchGroup sql.NullString
+			CardNumber        sql.NullString
+			NIP               sql.NullString
+			Expiration        sql.NullTime
+			OilCoName         sql.NullString
+			DateRemise        sql.NullTime
+			DateReprise       sql.NullTime
+			Active            sql.NullBool
+			Notes             sql.NullString
+		)
+		if err := rows.Scan(
+			&CardId,
+			&FirstName,
+			&LastName,
+			&IsBroker,
+			&Nom_DispatchGroup,
+			&CardNumber,
+			&NIP,
+			&Expiration,
+			&OilCoName,
+			&DateRemise,
+			&DateReprise,
+			&Active,
+			&Notes); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on cartesPretAllHandler: " + err.Error())
+			return
+		}
+
+		// Combine first and last names
+		nom := strings.TrimSpace(FirstName.String + " " + LastName.String)
+
+		out = append(out, rowOut{
+			CardId:            int(CardId.Int32),
+			Nom:               nom,
+			IsBroker:          IsBroker.Bool,
+			Nom_DispatchGroup: Nom_DispatchGroup.String,
+			CardNumber:        CardNumber.String,
+			NIP:               NIP.String,
+			Expiration: func() string {
+				if Expiration.Valid {
+					return Expiration.Time.Format("02/01/2006")
+				} else {
+					return ""
+				}
+			}(),
+			OilCoName: OilCoName.String,
+			DateRemise: func() string {
+				if DateRemise.Valid {
+					return DateRemise.Time.Format("02/01/2006")
+				} else {
+					return ""
+				}
+			}(),
+			DateReprise: func() string {
+				if DateReprise.Valid {
+					return DateReprise.Time.Format("02/01/2006")
+				} else {
+					return ""
+				}
+			}(),
+			Active: Active.Bool,
+			Notes:  Notes.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on cartesPretAllHandler: " + err.Error())
 		return
 	}
 
@@ -1875,77 +2079,13 @@ func villesAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
-func petitsVehiculesAllHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	// Test query - get column info first
-	query := `
-	SELECT 
-	id, operatorNo, FirstName, FK_DispatchGroup,startDate, deletedDate, isBroker
-	from dbo.Drivers where petitVehicule = 1;
-	`
-
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		http.Error(w, "query error: "+err.Error(), 500)
-		logger.Info("Query error on petitsVehiculesAllHandler: " + err.Error())
-		return
-	}
-	defer rows.Close()
-
-	type rowOut struct {
-		Id               string `json:"Id"`
-		OperatorNo       string `json:"OperatorNo"`
-		FirstName        string `json:"FirstName"`
-		FK_DispatchGroup string `json:"FK_DispatchGroup"`
-		StartDate        string `json:"StartDate"`
-		DeletedDate      string `json:"DeletedDate"`
-		IsBroker         string `json:"IsBroker"`
-	}
-	out := make([]rowOut, 0, 256)
-
-	for rows.Next() {
-		var (
-			Id               sql.NullString
-			OperatorNo       sql.NullString
-			FirstName        sql.NullString
-			FK_DispatchGroup sql.NullString
-			StartDate        sql.NullString
-			DeletedDate      sql.NullString
-			IsBroker         sql.NullString
-		)
-		if err := rows.Scan(&Id, &OperatorNo, &FirstName, &FK_DispatchGroup, &StartDate, &DeletedDate, &IsBroker); err != nil {
-			http.Error(w, "scan error: "+err.Error(), 500)
-			logger.Info("Scan error on petitsVehiculesAllHandler: " + err.Error())
-			return
-		}
-
-		out = append(out, rowOut{
-			Id:               Id.String,
-			OperatorNo:       OperatorNo.String,
-			FirstName:        FirstName.String,
-			FK_DispatchGroup: FK_DispatchGroup.String,
-			StartDate:        StartDate.String,
-			DeletedDate:      DeletedDate.String,
-			IsBroker:         IsBroker.String,
-		})
-	}
-	if err := rows.Err(); err != nil {
-		http.Error(w, "rows error: "+err.Error(), 500)
-		logger.Info("Rows error on petitsVehiculesAllHandler: " + err.Error())
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
-}
 func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
+
+	// à cause du fonctionnement d'une Float64, ceci cause une perte de précision lors de la transformation du prix ULSDQC1 en dollars
+	// (EX: 176.1 = 176.1000001)
+	//Pour réglé cette situation j'ai ajouter 3 colones qui ont Computer sur la valeur de ULSDQC1 / 100, stocker en decimal(10,4)
+	//et celle-cis sont envoyer en JSON en tant que string.
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1957,7 +2097,7 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 	// Test query - get column info first
 	query := `
 	SELECT 
-	[Date], ULSDQC1, ULSD1 from dbo.valeroRackPrice
+	[Date], PrixULSDQC1, GrosReservoir, PetitReservoir from dbo.valeroRackPrice
 	order by [date] desc;
 	`
 
@@ -1970,28 +2110,31 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type rowOut struct {
-		Date    string  `json:"Date"`
-		ULSDQC1 float32 `json:"ULSDQC1"`
-		ULSD1   float32 `json:"ULSD1"`
+		Date           string `json:"Date"`
+		PrixULSDQC1    string `json:"ULSDQC1"`
+		GrosReservoir  string `json:"GrosReservoir"`
+		PetitReservoir string `json:"PetitReservoir"`
 	}
 	out := make([]rowOut, 0, 256)
 
 	for rows.Next() {
 		var (
-			Date    sql.NullTime
-			ULSDQC1 sql.NullFloat64
-			ULSD1   sql.NullFloat64
+			Date           sql.NullTime
+			PrixULSDQC1    sql.NullString
+			GrosReservoir  sql.NullString
+			PetitReservoir sql.NullString
 		)
-		if err := rows.Scan(&Date, &ULSDQC1, &ULSD1); err != nil {
+		if err := rows.Scan(&Date, &PrixULSDQC1, &GrosReservoir, &PetitReservoir); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on rampeAllHandler: " + err.Error())
 			return
 		}
 
 		out = append(out, rowOut{
-			Date:    Date.Time.Format("2006-01-02"),
-			ULSDQC1: float32(ULSDQC1.Float64) / 100,
-			ULSD1:   float32(ULSD1.Float64) / 100,
+			Date:           Date.Time.Format("2006-01-02"),
+			PrixULSDQC1:    (PrixULSDQC1.String),
+			GrosReservoir:  (GrosReservoir.String),
+			PetitReservoir: (PetitReservoir.String),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -2816,6 +2959,92 @@ func brokersAddDriver(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, http.StatusOK, res)
 }
+
+// Update driver's dispatch group by operatorNo
+func driversUpdateGroupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on driversUpdateGroupHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	type reqBody struct {
+		OperatorNo    string `json:"operatorNo"`
+		DispatchGroup int    `json:"dispatchGroup"`
+		CSRF          string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on driversUpdateGroupHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	// CSRF
+	var csrfCandidates []string
+	if h := r.Header.Get("X-CSRF-Token"); h != "" {
+		csrfCandidates = append(csrfCandidates, h)
+	}
+	if body.CSRF != "" {
+		csrfCandidates = append(csrfCandidates, body.CSRF)
+	}
+	if c, err := r.Cookie("csrf_token"); err == nil {
+		if c != nil && c.Value != "" {
+			csrfCandidates = append(csrfCandidates, c.Value)
+		}
+	}
+	var validated bool
+	for _, candidate := range csrfCandidates {
+		if csrfManager.ValidateToken(candidate) {
+			validated = true
+			break
+		}
+	}
+	if !validated {
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		logger.Info("Invalid CSRF token provided to driversUpdateGroupHandler")
+		return
+	}
+
+	if strings.TrimSpace(body.OperatorNo) == "" || body.DispatchGroup <= 0 {
+		respondWithError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on driversUpdateGroupHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Update by operatorNo
+	updateQ := `UPDATE dbo.Drivers SET FK_DispatchGroup = @dg WHERE operatorNo = @op;`
+	if _, err := tx.ExecContext(ctx, updateQ, sql.Named("dg", body.DispatchGroup), sql.Named("op", strings.TrimSpace(body.OperatorNo))); err != nil {
+		logger.Info("Exec error on driversUpdateGroupHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on driversUpdateGroupHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Updated driver dispatch group: operatorNo=%s dispatchGroup=%d", body.OperatorNo, body.DispatchGroup))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
 func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -3377,166 +3606,15 @@ func villesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Info(fmt.Sprintf("User: %s updated Ville %s to Normalized %s", LastUpdateBy, SupplierCity, NormalizedCity))
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
-func petitsVehiculesAddDriver(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	// Parse request JSON (includes optional csrf token in body)
-	type reqBody struct {
-		FirstName        string `json:"FirstName"`
-		FK_DispatchGroup int    `json:"FK_DispatchGroup"`
-		StartDate        string `json:"startDate"`
-		DeletedDate      string `json:"deletedDate"`
-		PetitVehicule    string `json:"PetitVehicule"`
-		IsBroker         int    `json:"isBroker"`
-		FK_BrokerId      *int   `json:"FK_BrokerId"`
-		CSRF             string `json:"csrf,omitempty"`
-	}
-	var body reqBody
-
-	// Read raw body for diagnostics
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Info("ReadAll error on petitsVehiculesAddDriver: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-	logger.Info("petitsVehiculesAddDriver raw body: " + string(b))
-	if err := json.Unmarshal(b, &body); err != nil {
-		logger.Info("JSON unmarshal error on petitsVehiculesAddDriver: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-	session := GetSessionInfo(r)
-	user := "unknown"
-	if session != nil {
-		user = session.Username
-	}
-	logger.Info(fmt.Sprintf("Utilisateur %s ajoute le chauffeur de petit véhicule: Nom: nom=%s, dispatchGroup=%d, startDate=%q deletedDate=%s", user, body.FirstName, body.FK_DispatchGroup, body.StartDate, body.DeletedDate))
-
-	// Determine CSRF token: header -> body -> cookie
-	csrf := r.Header.Get("X-CSRF-Token")
-	if csrf == "" && body.CSRF != "" {
-		csrf = body.CSRF
-	}
-	if csrf == "" {
-		if c, err := r.Cookie("csrf_token"); err == nil {
-			csrf = c.Value
-		}
-	}
-	if csrf == "" {
-		respondWithError(w, http.StatusForbidden, "missing CSRF token")
-		return
-	}
-	if !csrfManager.ValidateToken(csrf) {
-		logger.Info("Invalid CSRF token provided to petitsVehiculesAddDriver")
-		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
-		return
-	}
-
-	// Generate and set a fresh token for subsequent requests
-	if newToken, err := csrfManager.GenerateToken(); err == nil {
-		csrfManager.SetTokenCookie(w, newToken)
-	} else {
-		logger.Info("Failed to generate CSRF token after petitsVehiculesAddDriver: " + err.Error())
-	}
-
-	if strings.TrimSpace(body.FirstName) == "" {
-		respondWithError(w, http.StatusBadRequest, "invalid petitsVehicules payload")
-		return
-	}
-	if body.StartDate == "" {
-		respondWithError(w, http.StatusBadRequest, "startDate required")
-		return
-	}
-
-	// Start transaction
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		logger.Info("BeginTx error on petitsVehiculesAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	// Insert driver and return new ID using OUTPUT
-	insertQ := `
-	SET NOCOUNT ON;
-	INSERT INTO dbo.Drivers (operatorNo, FirstName, FK_DispatchGroup, startDate, deletedDate, petitVehicule, isBroker, FK_BrokerId)
-	OUTPUT INSERTED.id
-	VALUES (@operatorNo, @FirstName, @FK_DispatchGroup, @startDate, @deletedDate, 1, @isBroker, @FK_BrokerId);
-	`
-
-	// Handle nullable deletedDate - convert "None" or empty to NULL
-	var deletedDateParam interface{}
-	if body.DeletedDate != "" && body.DeletedDate != "None" {
-		deletedDateParam = body.DeletedDate
-	} else {
-		deletedDateParam = nil
-	}
-
-	var newId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, insertQ,
-		sql.Named("operatorNo", "Petit"),
-		sql.Named("FirstName", body.FirstName),
-		sql.Named("FK_DispatchGroup", body.FK_DispatchGroup),
-		sql.Named("startDate", body.StartDate),
-		sql.Named("deletedDate", deletedDateParam),
-		sql.Named("isBroker", body.IsBroker),
-		sql.Named("FK_BrokerId", body.FK_BrokerId),
-	).Scan(&newId); err != nil {
-		logger.Info("Insert error on petitsVehiculesAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	logger.Info(fmt.Sprintf("petitsVehiculesAddDriver inserted id (tx): %v", newId))
-
-	// Verify insertion
-	var verifyId sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM dbo.Drivers WHERE FirstName = @FirstName AND petitVehicule = 1 ORDER BY id DESC`, sql.Named("FirstName", body.FirstName)).Scan(&verifyId); err != nil {
-		if err == sql.ErrNoRows {
-			logger.Info("Verification select: no rows found after insert for FirstName=" + body.FirstName)
-		} else {
-			logger.Info("Verification select error on petitsVehiculesAddDriver: " + err.Error())
-			respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-			return
-		}
-	} else {
-		logger.Info(fmt.Sprintf("Verification select found id: %v", verifyId))
-	}
-
-	if err := tx.Commit(); err != nil {
-		logger.Info("Commit error on petitsVehiculesAddDriver: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	res := map[string]interface{}{
-		"id":        nil,
-		"firstName": body.FirstName,
-	}
-	if newId.Valid {
-		res["id"] = int(newId.Int64)
-	}
-
-	respondWithJSON(w, http.StatusOK, res)
-}
-func petrolieresNotesUpdate(w http.ResponseWriter, r *http.Request) {
-
-}
 
 // petrolieresAddOilCoHandler - Add a new OilCo (Pétrolière)
 func petrolieresAddOilCoHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -3667,135 +3745,4 @@ func petrolieresAddOilCoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, res)
-}
-
-// petitsVehiculesUpdateHandler - Update StartDate and DeletedDate for a petit vehicule driver
-func petitsVehiculesUpdateHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	// Read body
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Info("ReadAll error on petitsVehiculesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	type reqBody struct {
-		DriverId    int     `json:"DriverId"`
-		StartDate   *string `json:"StartDate"`
-		DeletedDate *string `json:"DeletedDate"`
-		CSRF        string  `json:"csrf,omitempty"`
-	}
-	var body reqBody
-	if err := json.Unmarshal(b, &body); err != nil {
-		logger.Info("JSON unmarshal error on petitsVehiculesUpdateHandler: " + err.Error() + " -- raw: " + string(b))
-		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	// CSRF token validation
-	csrf := r.Header.Get("X-CSRF-Token")
-	if csrf == "" && body.CSRF != "" {
-		csrf = body.CSRF
-	}
-	if csrf == "" {
-		if c, err := r.Cookie("csrf_token"); err == nil {
-			csrf = c.Value
-		}
-	}
-	if csrf == "" {
-		respondWithError(w, http.StatusForbidden, "missing CSRF token")
-		return
-	}
-	if !csrfManager.ValidateToken(csrf) {
-		logger.Info("Invalid CSRF token provided to petitsVehiculesUpdateHandler")
-		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
-		return
-	}
-
-	// Generate fresh token
-	if newToken, err := csrfManager.GenerateToken(); err == nil {
-		csrfManager.SetTokenCookie(w, newToken)
-	}
-
-	if body.DriverId <= 0 {
-		respondWithError(w, http.StatusBadRequest, "invalid DriverId")
-		return
-	}
-
-	session := GetSessionInfo(r)
-	user := "unknown"
-	if session != nil {
-		user = session.Username
-	}
-	logger.Info(fmt.Sprintf("Utilisateur %s met à jour le chauffeur petit vehicule DriverId=%d", user, body.DriverId))
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		logger.Info("BeginTx error on petitsVehiculesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update driver dates - use TRY_CONVERT to handle date format conversion
-	updateQ := `
-UPDATE dbo.Drivers
-SET startDate = TRY_CONVERT(date, @startDate, 120),
-	deletedDate = TRY_CONVERT(date, @deletedDate, 120)
-WHERE id = @driverId AND petitVehicule = 1;
-`
-
-	// Prepare nullable params for dates: send NULL when value is nil or empty
-	var startDateParam interface{}
-	if body.StartDate != nil {
-		s := strings.TrimSpace(*body.StartDate)
-		if s != "" {
-			startDateParam = s
-		} else {
-			startDateParam = nil
-		}
-	} else {
-		startDateParam = nil
-	}
-
-	var deletedDateParam interface{}
-	if body.DeletedDate != nil {
-		s := strings.TrimSpace(*body.DeletedDate)
-		if s != "" {
-			deletedDateParam = s
-		} else {
-			deletedDateParam = nil
-		}
-	} else {
-		deletedDateParam = nil
-	}
-
-	if _, err := tx.ExecContext(ctx, updateQ,
-		sql.Named("startDate", startDateParam),
-		sql.Named("deletedDate", deletedDateParam),
-		sql.Named("driverId", body.DriverId),
-	); err != nil {
-		logger.Info("Exec error on petitsVehiculesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		logger.Info("Commit error on petitsVehiculesUpdateHandler: " + err.Error())
-		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
-		return
-	}
-
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "Driver dates updated successfully",
-	})
 }

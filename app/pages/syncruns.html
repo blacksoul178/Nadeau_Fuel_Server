@@ -28,54 +28,7 @@
 </style>
 
 <body>
-    <header>
-        <div>
-            <h1>Fuel'O'Matic Nadeau</h1>
-        </div>
-        <div class="user-info">
-            {{.Username}}
-            <span class="role-badge {{.Role}}">{{.Role}}</span>
-        <form action="/logout" method="POST">
-        <!-- CSRF Token for logout -->
-        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
-        <button type="submit" class="logout-btn">Logout</button>
-        </div>
-    </form>
-  </header>
-  <br>
-  
-  <section id="content">
-        <h2>Bienvenue {{.Username}}</h2> 
-        {{if .IsAdmin}}
-        <div class="admin-section">
-            <h3>Admin Panel</h3>
-            <p>You have admin access. You can manage:</p>
-            <nav>
-              <a href="/admin">Admin Dashboard</a>
-                <a href="/admin/users">Manage Users</a>
-                <a href="/admin/syncruns" class="tab active">View last syncruns</a>
-                <a href="/admin/logs">View logs</a>
-              </nav>
-        </div>
-        {{end}}
-        <h4>Navigation</h4>
-        
-        <nav class="tabs">
-          <a href="/chauffeurs"    class="tab">Chauffeurs</a>
-    <a href="/cartes"        class="tab">Cartes</a>
-    <a href="/brokers"       class="tab">Compagnies Broker</a>
-    <a href="/vehicules"     class="tab">Véhicules</a>
-    <a href="/taux"   class="tab">Taux</a>
-    <a href="/peages"   class="tab">Péages</a>
-    <a href="/camionsBroker"   class="tab">Camions Broker</a>
-    <div class="tab-spacer"></div>
-    <a href="/transactions"  class="tab">Transactions</a>
-    <a href="/petrolieres"   class="tab">Pétrolières</a>
-    <a href="/prixFuel"   class="tab">Prix Fuel</a>
-    <a href="/villes"   class="tab">Villes</a>
-    <a href="/rampe"   class="tab">Prix à la rampe</a>
-  </nav>
-</section>
+ {{template "header" .}}
 
 
 <main class="container">
