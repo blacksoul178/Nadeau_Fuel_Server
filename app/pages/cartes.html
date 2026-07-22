@@ -15,9 +15,9 @@
 <main class="container">
     <!-- Ajout de Cartes -->
     <section class="panel">
-            <label for="Ajout de carte">Ajout de carte</label>
+            <b>Ajout de carte</b>
             <div>
-                <label for="driverName">Nom du chauffeur *</label>
+                <b>Nom du chauffeur *</b>
                 <input name="driverName" id="driverName" list="driverList" placeholder="Tapez un nom..." autocomplete="off">
                 <datalist id="driverList"></datalist>
                 <br>
@@ -148,7 +148,7 @@
     // Populate oil company datalist from API
     async function populateOilCoList() {
       try {
-        const res = await fetch('/api/petrolieres/all', { headers: { 'Accept': 'application/json' } });
+        const res = await fetch('/api/petrolieres/allPetrolieres', { headers: { 'Accept': 'application/json' } });
         if (!res.ok) return;
         const list = await res.json();
         const dl = document.getElementById('oilCoList');
@@ -186,12 +186,12 @@
         if (event.key !== 'Enter' || event.shiftKey) return;
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
-        if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes')) return;
+        if (!target.matches('.inp-nip, .inp-exp, .inp-dr, .inp-dre, .inp-notes')) return;
         event.preventDefault();
         btn.click();
       };
       row._enterSubmitHandler = handler;
-      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes'].forEach(selector => {
+      ['.inp-nip', '.inp-exp', '.inp-dr', '.inp-dre', '.inp-notes'].forEach(selector => {
         row.querySelectorAll(selector).forEach(el => el.addEventListener('keydown', handler));
       });
     }
@@ -199,7 +199,7 @@
     function detachEnterSubmitFromRow(row) {
       if (!row || !row._enterSubmitHandler) return;
       const handler = row._enterSubmitHandler;
-      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes'].forEach(selector => {
+      ['.inp-nip', '.inp-exp', '.inp-dr', '.inp-dre', '.inp-notes'].forEach(selector => {
         row.querySelectorAll(selector).forEach(el => el.removeEventListener('keydown', handler));
       });
       delete row._enterSubmitHandler;
@@ -210,7 +210,7 @@
         if (event.key !== 'Enter' || event.shiftKey) return;
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
-        if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes')) return;
+        if (!target.matches('.inp-nip, .inp-exp, .inp-dr, .inp-dre, .inp-notes')) return;
         const row = target.closest('tr');
         if (!row) return;
         const btn = row.querySelector('.btn-edit[data-editing="1"]');
@@ -223,14 +223,14 @@
 
     // Fetch ALL once (small table)
     async function loadAll() {
-      const res = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/cartes/allCartes', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       
 
       state.data = await res.json();
       // Fetch driver names from /api/chauffeurs/all for the datalist
       try {
-        const driversRes = await fetch('/api/chauffeurs/all', { headers: { 'Accept': 'application/json' } });
+        const driversRes = await fetch('/api/chauffeurs/allChauffeurs', { headers: { 'Accept': 'application/json' } });
         if (driversRes.ok) {
           const drivers = await driversRes.json();
           populateDriverNameSelect(drivers);
@@ -340,7 +340,7 @@
                 <td data-field="CardNumber">${r.CardNumber ?? ''}</td>
                 <td class="cell-nip" data-field="NIP" data-cardid="${r.CardId}"><span class="val">${r.NIP ?? ''}</span></td>
                 <td data-field="OilCoName">${r.OilCoName ?? ''}</td>
-                <td data-field="Expiration">${r.Expiration ?? ''}</td>
+                <td class="cell-exp" data-field="Expiration" data-cardid="${r.CardId}"><span class="val">${r.Expiration ?? ''}</span></td>
                 <td class="cell-dr" data-field="DateRemise" data-cardid="${r.CardId}"><span class="val">${r.DateRemise ?? ''}</span></td>
                 <td class="cell-dre" data-field="DateReprise" data-cardid="${r.CardId}"><span class="val">${r.DateReprise ?? ''}</span></td>
                 <td data-field="Active">${r.Active ?? ''}</td>
@@ -382,6 +382,7 @@
                 const cardId = btn.dataset.cardid;
                 const row = btn.closest('tr');
                 const nipCell = row.querySelector('.cell-nip .val');
+                const expCell = row.querySelector('.cell-exp .val');
                 const drCell = row.querySelector('.cell-dr .val');
                 const dreCell = row.querySelector('.cell-dre .val');
                 const notesCell = row.querySelector('td[data-field="Notes"]');
@@ -390,6 +391,7 @@
                 if (!isEditing) {
                   // switch to inputs
                   const nipVal = nipCell ? nipCell.textContent.trim() : '';
+                  let expVal = expCell ? expCell.textContent.trim() : '';
                   let drVal = drCell ? drCell.textContent.trim() : '';
                   let dreVal = dreCell ? dreCell.textContent.trim() : '';
                   // Convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD for input type="date"
@@ -414,12 +416,16 @@
                     const _t = new Date();
                     return `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, '0')}-${String(_t.getDate()).padStart(2, '0')}`;
                   }
+                  const expValDate = toDateInput(expVal) || '';
                   const drValDate = toDateInput(drVal) || getToday();
                   const dreValDate = toDateInput(dreVal) || '';
                   const notesVal = notesCell ? notesCell.textContent.trim() : '';
 
                   if (nipCell) {
                     nipCell.parentElement.innerHTML = `<input class="inp-nip" autocomplete="off" value="${nipVal}">`;
+                  }
+                  if (expCell) {
+                    expCell.parentElement.innerHTML = `<input class="inp-exp" type="date" autocomplete="off" value="${expValDate}">`;
                   }
                   if (drCell) {
                     drCell.parentElement.innerHTML = `<input class="inp-dr" type="date" autocomplete="off" value="${drValDate}">`;
@@ -449,10 +455,12 @@
                   detachEnterSubmitFromRow(row);
                   // save
                   const nip = row.querySelector('.inp-nip')?.value.trim() || '';
+                  let exp = row.querySelector('.inp-exp')?.value.trim() || '';
                   let drRaw = row.querySelector('.inp-dr')?.value;
                   let dreRaw = row.querySelector('.inp-dre')?.value;
                   let dr = drRaw == null ? null : drRaw.trim();
                   let dre = dreRaw == null ? null : dreRaw.trim();
+                  if (exp === '') exp = null;
                   if (dr === '') dr = null;
                   if (dre === '') dre = null;
 
@@ -464,14 +472,14 @@
                     const res = await fetch('/api/cartes/update', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-                      body: JSON.stringify({ CardId: Number(cardId), NIP: nip, DateRemise: dr, DateReprise: dre, Notes: notes })
+                      body: JSON.stringify({ CardId: Number(cardId), NIP: nip, Expiration: exp, DateRemise: dr, DateReprise: dre, Notes: notes })
                     });
                     if (!res.ok) {
                       const txt = await res.text(); throw new Error(txt || res.statusText);
                     }
                     // Fetch updated data for this card and re-render row
                     try {
-                      const carteRes = await fetch('/api/cartes/all', { headers: { 'Accept': 'application/json' } });
+                      const carteRes = await fetch('/api/cartes/allCartes', { headers: { 'Accept': 'application/json' } });
                       if (carteRes.ok) {
                         const allCartes = await carteRes.json();
                         const updatedCarte = allCartes.find(c => c.CardId === Number(cardId));
@@ -485,7 +493,7 @@
                             <td data-field="CardNumber">${updatedCarte.CardNumber ?? ''}</td>
                             <td class="cell-nip" data-field="NIP" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.NIP ?? ''}</span></td>
                             <td data-field="OilCoName">${updatedCarte.OilCoName ?? ''}</td>
-                            <td data-field="Expiration">${updatedCarte.Expiration ?? ''}</td>
+                            <td class="cell-exp" data-field="Expiration" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.Expiration ?? ''}</span></td>
                             <td class="cell-dr" data-field="DateRemise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateRemise ?? ''}</span></td>
                             <td class="cell-dre" data-field="DateReprise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateReprise ?? ''}</span></td>
                             <td data-field="Active">${updatedCarte.Active ?? ''}</td>

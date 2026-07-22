@@ -30,6 +30,7 @@ func parsePageTemplate(pageFile string) *template.Template {
 var tplSyncruns = parsePageTemplate("syncruns.html")
 var tplLogs = parsePageTemplate("logs.html")
 var tplUsers = parsePageTemplate("users.html")
+var tplManual = parsePageTemplate("manual.html")
 
 // tous
 var tplLogin = parsePageTemplate("login.html")
@@ -83,23 +84,24 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/admin/syncruns", requireLogin(syncrunsHandler))
 	mux.HandleFunc("/admin/logs", requireLogin(logsHandler))
 	mux.HandleFunc("/admin/users", requireLogin(usersHandler))
+	mux.HandleFunc("/admin/manual", requireLogin(manualHandler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { //root
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
 
 	//Get API ALL USERS
-	mux.Handle("GET /api/chauffeurs/all", requireLogin(http.HandlerFunc(chauffeursAllHandler)))
-	mux.Handle("GET /api/chauffeurs/pret", requireLogin(http.HandlerFunc(chauffeursPretHandler)))
-	mux.Handle("GET /api/cartes/all", requireLogin(http.HandlerFunc(cartesAllHandler)))
-	mux.Handle("GET /api/cartesPret/all", requireLogin(http.HandlerFunc(cartesPretAllHandler)))
-	mux.Handle("GET /api/brokers/all", requireLogin(http.HandlerFunc(brokersAllHandler)))
-	mux.Handle("GET /api/vehicules/all", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
+	mux.Handle("GET /api/chauffeurs/allChauffeurs", requireLogin(http.HandlerFunc(chauffeursAllHandler)))
+	mux.Handle("GET /api/chauffeurs/chauffeursPret", requireLogin(http.HandlerFunc(chauffeursPretHandler)))
+	mux.Handle("GET /api/cartes/allCartes", requireLogin(http.HandlerFunc(cartesAllHandler)))
+	mux.Handle("GET /api/cartesPret/allCartesPret", requireLogin(http.HandlerFunc(cartesPretAllHandler)))
+	mux.Handle("GET /api/brokers/allBrokers", requireLogin(http.HandlerFunc(brokersAllHandler)))
+	mux.Handle("GET /api/vehicules/allVehicules", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
 	mux.Handle("GET /api/taux/allWeek", requireLogin(http.HandlerFunc(tauxAllWeekHandler)))
 
 	//Get API Super Users
-	mux.Handle("GET /api/transactions/all", requireLogin(http.HandlerFunc(transactionsAllHandler)))
+	mux.Handle("GET /api/transactions/allTransactions", requireLogin(http.HandlerFunc(transactionsAllHandler)))
 	mux.Handle("GET /api/transactions/sync-status", requireLogin(http.HandlerFunc(syncStatusHandler)))
-	mux.Handle("GET /api/petrolieres/all", requireLogin(http.HandlerFunc(petrolieresAllHandler)))
+	mux.Handle("GET /api/petrolieres/allPetrolieres", requireLogin(http.HandlerFunc(petrolieresAllHandler)))
 	mux.Handle("GET /api/prixFuel/globalJour", requireLogin(http.HandlerFunc(prixFuelGlobalJourHandler)))
 	mux.Handle("GET /api/prixFuel/globalSemaine", requireLogin(http.HandlerFunc(prixFuelGlobalSemaineHandler)))
 	mux.Handle("GET /api/prixFuel/diffJour", requireLogin(http.HandlerFunc(prixFuelDiffJourHandler)))
@@ -110,8 +112,8 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("GET /api/prixFuel/jour", requireLogin(http.HandlerFunc(prixFuelJourHandler)))
 	mux.Handle("GET /api/prixFuel/regionSemaine", requireLogin(http.HandlerFunc(prixFuelRegionSemaineHandler)))
 	mux.Handle("GET /api/prixFuel/semaine", requireLogin(http.HandlerFunc(prixFuelSemaineHandler)))
-	mux.Handle("GET /api/villes/all", requireLogin(http.HandlerFunc(villesAllHandler)))
-	mux.Handle("GET /api/rampe/all", requireLogin(http.HandlerFunc(rampeAllHandler)))
+	mux.Handle("GET /api/villes/allVilles", requireLogin(http.HandlerFunc(villesAllHandler)))
+	mux.Handle("GET /api/rampe/allRampe", requireLogin(http.HandlerFunc(rampeAllHandler)))
 	// TODO   mux.Handle("GET /api/peages/all", requireLogin(http.HandlerFunc(peagesAllHandler)))
 	//mux.Handle("GET /api/camionsBroker/all", requireLogin(http.HandlerFunc(camionsBrokerAllHandler)))
 
@@ -136,11 +138,14 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	//admin APIs
 	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsAllHandler)))
 	mux.Handle("GET /api/admin/logs", requireLogin(http.HandlerFunc(logsApiHandler)))
-	mux.Handle("GET /api/admin/users/all", requireLogin(http.HandlerFunc(usersAllHandler)))
+	mux.Handle("GET /api/admin/users/allUsers", requireLogin(http.HandlerFunc(usersAllHandler)))
+	mux.Handle("GET /api/admin/chauffeurs/allChauffeurs", requireLogin(http.HandlerFunc(adminChauffeursAllHandler)))
 	mux.Handle("POST /api/admin/users/create", requireLogin(http.HandlerFunc(usersCreateHandler)))
 	mux.Handle("POST /api/admin/users/delete", requireLogin(http.HandlerFunc(usersDeleteHandler)))
 	mux.Handle("POST /api/admin/users/changePasswordForUser", requireLogin(http.HandlerFunc(usersChangePasswordForUserHandler)))
 	mux.Handle("POST /api/admin/users/update", requireLogin(http.HandlerFunc(usersUpdateHandler)))
+	mux.Handle("POST /api/admin/drivers/add", requireLogin(http.HandlerFunc(adminAddDriverHandler)))
+	mux.Handle("POST /api/admin/drivers/update", requireLogin(http.HandlerFunc(adminDriversUpdateHandler)))
 
 }
 

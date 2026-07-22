@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{.CSRFToken}}">
+    <title>Fuel'O'Matic - Manual Changes</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    
+</head>
+<body>
+ {{template "header" .}}
+
+
+<main class="container">
+    <!-- Ajout de "Chauffeur" -->
+    <section class="panel">
+      <div>
+            <b>Ajout de chauffeur Manuel</b>
+              <span style="color: red;">ATTENTION CECI MODIFIE/AJOUTE LES DONNÉES DIRECTEMENT DANS LA BD!</span>
+              </div>
+            <div>
+              <b>Info du chauffeur</b>
+              <input name="operatorNo" id="operatorNo" placeholder="Tapez un #Op..." autocomplete="off">
+              <br>
+              <input name="driverFirstName" id="driverFirstName" placeholder="Tapez un prénom..." autocomplete="off">
+              <br>
+              <input name="driverLastName" id="driverLastName" placeholder="Tapez un nom de famille..." autocomplete="off">
+            </div>
+            <div>
+              <label for="dispatchGroup">DispatchGroup <select name="Compagnie Facturable" id="dispatchGroup">
+              <option value="0">0 - Faire un choix</option>
+              <option value="1">1 - TGN</option>
+              <option value="2">2 - TMC</option>
+              <option value="4">4 - MTA</option>
+              <option value="5">5 - GJF</option>
+              <option value="6">6 - 9001</option>
+            </select></label>
+              
+              <label for="startDate">Start Date <input type="date" name="startDate" id="startDate" autocomplete="off"></label>
+              
+              <label for="deletedDate">Deleted Date <input type="date" name="deletedDate" id="deletedDate" autocomplete="off"></label>
+              
+            </div>
+            <div>
+              <label>
+              <input type="checkbox" id="facturablePetitVehicule" />   Facturable Petit Véhicules
+              </label>
+              <label><input type="checkbox" id="rapportIFTA" checked/>   Rapport IFTA</label>
+              <label><input type="checkbox" id="pret" checked/>   Utilisateur pour carte de pret</label>
+            </div>  
+            <button type="submit" class="AdminAjouterChauffeur">Ajouter</button>
+</section>
+  </main>
+  
+
+  
+<main class="container">
+    <!-- Filters -->
+    <section class="panel">
+        <div>
+            <label for="f-search">Recherche</label>
+      <input type="text" id="f-search" placeholder="ex.: Nom, numéro carte, Pétrolière" autocomplete="off">
+            </div>
+      <div>
+        <label for="f-dispatchGroup">Groupe</label>
+      <select id="f-dispatchGroup">
+        <option value="">Tous</option>
+        <option value="TGN">TGN</option>
+        <option value="TMC">TMC</option>
+        <option value="GJF">GJF</option>
+        <option value="MTA">MTA</option>
+        <option value="9001">9001</option>
+      </select>
+      </div>
+      <div class="spacer"></div>
+      <span id="count" style="opacity:.7;"></span>
+      <button id="reset-filters" style="margin-left: 10px; padding: 5px 10px; cursor: pointer;">Réinitialiser filtres</button>
+    </section>
+
+    <!-- Table -->
+    <section class="panel">
+      <table id="tbl" class="table">
+        <thead>
+          <tr>
+            <th class="col-120">operatorNo</th>
+            <th class="col-120">first+last name</th>
+            <th class="col-80">FK_DGroup</th>
+            <th class="col-120">startDate</th>
+            <th class="col-120">deletedDate</th>
+            <th class="col-80">Facturable Petits Vehicules</th>
+            <th class="col-200">Superviseur</th>
+            <th class="col-80">Rapports IFTA</th>
+            <th class="col-80">"Chauffeur" Prêt</th>
+            <th class="col-80 nowrap">Controles</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+
+<script>
+  // Expose delete permission to JS (for dynamic UI)
+  const CAN_DELETE = {{if or .IsAdmin .IsSuperUser}}true{{else}}false{{end}}; // THIS shows an error in vscode but it is linter related and works fine
+    
+    const state = { data: [],
+      filtered: [],
+      debounceTimer: null,
+      validDriverNames: new Set()
+    }
+    
+    function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
+      if (typeof v === 'boolean') return v;
+      if (v == null) return null;
+      const s = String(v).trim().toLowerCase();
+      if (['true', '1', 'oui', 'yes'].includes(s)) return true;
+      if (['false', '0', 'non', 'no'].includes(s)) return false;
+      return null; // inconnu
+    }
+
+    function autoResizeTextarea(textarea) {
+      if (!textarea) return;
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    }
+
+    // Mapping from group name to DB id
+    const dispatchGroupNameToId = {None:0, TGN: 1, TMC: 2, MTA: 4, GJF: 5, '9001': 6  };
+
+    function attachEnterSubmitToRowInputs(row) {
+      if (!row) return;
+      const btn = row.querySelector('.btn-edit[data-editing="1"]');
+      if (!btn) return;
+      const handler = event => {
+        if (event.key !== 'Enter' || event.shiftKey) return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (!target.matches('.inp-FKDG, .inp-pret, .inp-facturable, .inp-superviseur, .inp-rapport')) return;
+        event.preventDefault();
+        btn.click();
+      };
+      row._enterSubmitHandler = handler;
+      ['.inp-FKDG', '.inp-pret', '.inp-facturable', '.inp-superviseur', '.inp-rapport'].forEach(selector => {
+        row.querySelectorAll(selector).forEach(el => el.addEventListener('keydown', handler));
+      });
+    }
+
+    function detachEnterSubmitFromRow(row) {
+      if (!row || !row._enterSubmitHandler) return;
+      const handler = row._enterSubmitHandler;
+      ['.inp-FKDG', '.inp-pret', '.inp-facturable', '.inp-superviseur', '.inp-rapport'].forEach(selector => {
+        row.querySelectorAll(selector).forEach(el => el.removeEventListener('keydown', handler));
+      });
+      delete row._enterSubmitHandler;
+    }
+
+    function attachGlobalEnterSubmitHandler() {
+      document.body.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.shiftKey) return;
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (!target.matches('.inp-FKDG, .inp-pret, .inp-facturable, .inp-superviseur, .inp-rapport')) return;
+        const row = target.closest('tr');
+        if (!row) return;
+        const btn = row.querySelector('.btn-edit[data-editing="1"]');
+        if (!btn) return;
+        event.preventDefault();
+        btn.click();
+      });
+    }
+
+
+    // Fetch ALL once (small table)
+    async function loadAll() {
+      const res = await fetch('/api/admin/chauffeurs/allChauffeurs', { headers: { 'Accept': 'application/json' } });
+      if (!res.ok)throw new Error('HTTP ' + res.status);
+      
+
+      state.data = await res.json();
+
+            // Pré-calcul du haystack de recherche et normalisation des champs
+            state.data = state.data.map(r => {
+              // Tolérer les variations de casse/typo sur nomCommunGl
+              const operatorNo = r.operatorNo ?? '';
+              const Nom = r.Nom ?? '';
+              const Groupe = r.Groupe ?? '';
+              const StartDate = r.startDate ?? '';
+              const DeletedDate = r.deletedDate ?? '';
+              const FacturablePetitVehicule = parseBoolLoose(r.facturablePetitVehicule) ?? '';
+              const Superviseur = r.superviseur ?? '';
+              const RapportIFTA = parseBoolLoose(r.rapportIFTA) ?? '';
+              const Pret = parseBoolLoose(r.pret) ?? '';
+              
+              //const unitIsIFTAPlatedBool = parseBoolLoose(r.unitIsIFTAPlated);
+
+              const haystack = [
+                Nom
+              ].join(' ').toLowerCase();
+
+              return {
+                ...r,
+                operatorNo,
+                Nom,
+                Groupe,
+                StartDate,
+                DeletedDate,
+                FacturablePetitVehicule,
+                Superviseur,
+                RapportIFTA,
+                Pret,
+                _haystack: haystack
+              };
+            });
+          }
+
+
+    
+    // Debounce helper
+      function debounce(fn, wait = 250) {
+        return function(...args) {
+          clearTimeout(state.debounceTimer);
+          state.debounceTimer = setTimeout(() => fn.apply(this, args), wait);
+        };
+      }
+
+
+    // Apply client-side filter
+    
+      function applyFilter() {
+        const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+        const dispatchGroup = (document.getElementById('f-dispatchGroup').value || '');
+
+        // Save filter state to localStorage
+        try {
+          localStorage.setItem('manual_filter_search', document.getElementById('f-search').value || '');
+          localStorage.setItem('manual_filter_dispatchGroup', document.getElementById('f-dispatchGroup').value || '');
+        } catch (e) {
+          // localStorage might be disabled
+        }
+
+        let rows = state.data;
+
+        if (search) {
+          rows = rows.filter(r => r._haystack.includes(search));
+        }
+
+        if (dispatchGroup) {
+          rows = rows.filter(r => (r.Groupe ?? '') === dispatchGroup);
+        }
+
+        render(rows);
+      }
+
+
+    // Render table
+    
+      function render(rows) {
+            const tb = document.querySelector('#tbl tbody');
+            tb.innerHTML = '';
+
+            const frag = document.createDocumentFragment();
+
+            rows.forEach(r => {
+              const tr = document.createElement('tr');
+              let controls = `<button class="btn-edit" data-operator-no="${r.operatorNo}">Modifier</button>`;
+              tr.innerHTML = `
+                <td>${r.operatorNo ?? ''}</td>
+                <td>${r.Nom ?? ''}</td>
+                <td class="cell-FKDG" data-field="Groupe" data-operator-no="${r.operatorNo}"><span class="val">${r.Groupe?? ''}</span></td>
+                <td class="cell-sd" data-field="StartDate" data-operator-no="${r.operatorNo}"><span class="val">${r.StartDate ?? ''}</span></td>
+                <td class="cell-dd" data-field="deletedDate" data-operator-no="${r.operatorNo}"><span class="val">${r.DeletedDate ?? ''}</span></td>
+                <td class="cell-facturable" data-field="facturable" data-operator-no="${r.operatorNo}"><span class="val">${r.FacturablePetitVehicule ?? ''}</span></td>
+                <td class="cell-superviseur" data-field="superviseur" data-operator-no="${r.operatorNo}"><span class="val">${r.Superviseur ?? ''}</span></td>
+                <td class="cell-rapport" data-field="rapport" data-operator-no="${r.operatorNo}"><span class="val">${r.RapportIFTA ?? ''}</span></td>
+                <td class="cell-pret" data-field="pret" data-operator-no="${r.operatorNo}"><span class="val">${r.Pret ?? ''}</span></td>
+                <td>${controls}</td>
+              `;
+              frag.appendChild(tr);
+            });
+
+            tb.appendChild(frag);
+
+            const count = rows.length;
+            document.getElementById('count').textContent = count + (count > 1 ? ' résultats' : ' résultat');
+          }
+
+      // Global helper to retrieve CSRF token (meta -> cookie)
+      function getCSRF() {
+        const m = document.querySelector('meta[name="csrf-token"]');
+        if (m && m.content) return m.content;
+        // fallback to cookie
+        const v = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('csrf_token='));
+        if (v) return v.split('=')[1];
+        return '';
+      }
+
+
+    
+        // Event delegation for row selection (avoids N listeners)
+          function setupRowSelection() {
+            const tb = document.querySelector('#tbl tbody');
+              tb.addEventListener('click', async function (e) {
+                const tr = e.target.closest('tr');
+               if (!e.target.matches('.btn-edit')) {
+                tr.classList.toggle('selected');
+                return;
+               }
+               //if (tr && e.target.tagName !== 'BUTTON') tr.classList.toggle('selected');
+               // Row selection
+
+               // Edit / Save
+               if (e.target.matches('.btn-edit')) {
+                 const btn = e.target;
+ 
+                 const operatorNo = btn.dataset.operatorNo;
+                 const row = btn.closest('tr');
+                 const FKDGCell = row.querySelector('.cell-FKDG .val');
+                 const sdCell = row.querySelector('.cell-sd .val');
+                 const ddCell = row.querySelector('.cell-dd .val');
+                 const facturableCell = row.querySelector('.cell-facturable .val');
+                 const superviseurCell = row.querySelector('.cell-superviseur .val');
+                 const rapportCell = row.querySelector('.cell-rapport .val');
+                 const pretCell = row.querySelector('.cell-pret .val');
+
+                 const isEditing = btn.dataset.editing === '1';
+                 if (!isEditing) {
+                   // switch to inputs
+                   const FKDGVal = FKDGCell ? FKDGCell.textContent.trim() : '';
+                   const sdVal = sdCell ? sdCell.textContent.trim() : '';
+                   const ddVal = ddCell ? ddCell.textContent.trim() : '';
+                   const facturableVal = facturableCell ? facturableCell.textContent.trim() : '';
+                   const superviseurVal = superviseurCell ? superviseurCell.textContent.trim() : '';
+                   const rapportVal = rapportCell ? rapportCell.textContent.trim() : '';
+                   const pretVal = pretCell ? pretCell.textContent.trim() : '';
+                   // Convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD for input type="date"
+                   function toDateInput(val) {
+                     if (!val) return '';
+                     // DD-MM-YYYY
+                     if (/^\d{2}-\d{2}-\d{4}$/.test(val)) {
+                       const [dd, mm, yyyy] = val.split('-');
+                       return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                     }
+                     // DD/MM/YYYY
+                     if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                       const [dd, mm, yyyy] = val.split('/');
+                       return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                     }
+                     // Already correct
+                     if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+                     return '';
+                   }
+                  // Only default to today if value is empty
+                  function getToday() {
+                    const _t = new Date();
+                    return `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, '0')}-${String(_t.getDate()).padStart(2, '0')}`;
+                  }
+                  const sdValDate = toDateInput(sdVal) || getToday();
+                  const ddValDate = toDateInput(ddVal) || '';
+                  if (FKDGCell) {
+                    FKDGCell.parentElement.innerHTML = `<select class="inp-FKDG"
+                    <option value="1" ${FKDGVal === 'TGN' ? 'selected' : ''}>TGN</option>
+                    <option value="2" ${FKDGVal === 'TMC' ? 'selected' : ''}>TMC</option>
+                    <option value="4" ${FKDGVal === 'MTA' ? 'selected' : ''}>MTA</option>
+                    <option value="5" ${FKDGVal === 'GJF' ? 'selected' : ''}>GJF</option>
+                    <option value="6" ${FKDGVal === '9001' ? 'selected' : ''}>9001</option>
+                    </select>
+                    `;
+                  }
+                  if (sdCell) {
+                    sdCell.parentElement.innerHTML = `<input class="inp-sd" type="date" autocomplete="off" value="${sdValDate}">`;
+                  }
+                  if (ddCell) {
+                    ddCell.parentElement.innerHTML = `<input class="inp-dd" type="date" autocomplete="off" value="${ddValDate}">`;
+                  }
+                  if (facturableCell) {
+                    facturableCell.parentElement.innerHTML = `<input class="inp-facturable" type="checkbox" ${facturableVal === true || facturableVal === "true" ? "checked" : ""}>`;
+                  }
+                  if (superviseurCell) {
+                    superviseurCell.parentElement.innerHTML = `<input class="inp-superviseur" autocomplete="off" value="${superviseurVal}">`;
+                  }
+                  if (rapportCell) {
+                    rapportCell.parentElement.innerHTML = `<input class="inp-rapport" type="checkbox"${rapportVal === true || rapportVal === "true" ? "checked" : ""}>`;
+                  }
+                  if (pretCell) {
+                    pretCell.parentElement.innerHTML = `<input class="inp-pret" type="checkbox" ${pretVal === true || pretVal === "true" ? "checked" : ""}>`;
+                  }
+
+                  btn.dataset.editing = '1';
+                    btn.textContent = 'Sauvegarder';
+                    return;
+                
+                  
+                } else {
+                  try {
+                    const payload = {
+                      
+                      operatorNo: operatorNo,
+                      dispatchGroup: Number(row.querySelector('.inp-FKDG')?.value || 0),
+                      startDate: row.querySelector('.inp-sd')?.value || '',
+                      deletedDate: row.querySelector('.inp-dd')?.value || '',
+                      facturablePetitVehicule: row.querySelector('.inp-facturable')?.checked || false,
+                      superviseur: row.querySelector('.inp-superviseur')?.value || '',
+                      rapportIFTA: row.querySelector('.inp-rapport')?.checked || false,
+                      pret: row.querySelector('.inp-pret')?.checked || false
+                    };
+                    console.log("UPDATE PAYLOAD", payload);
+                    const res = await fetch('/api/admin/drivers/update', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': getCSRF()
+                          },
+                          body: JSON.stringify(payload)
+                        });
+                          
+                    if (!res.ok) {
+                          const txt = await res.text();
+                          throw new Error(txt || res.statusText);
+                        }
+
+                    // Fetch updated data for this operator and re-render row
+                    try {
+                      const chauffeursRes = await fetch('/api/admin/chauffeurs/allChauffeurs', { headers: { 'Accept': 'application/json' } });
+                      if (chauffeursRes.ok) {
+                        const allChauffeurs = await chauffeursRes.json();
+                        const updatedChauffeurs = allChauffeurs.find(c => c.operatorNo == operatorNo );
+                        if (updatedChauffeurs) {
+                          // Re-render this row with updated data
+                          const controls = `<button class="btn-edit" data-operator-no="${updatedChauffeurs.operatorNo}">Modifier</button>`;
+                          row.innerHTML = `
+                            <td>${updatedChauffeurs.operatorNo ?? ''}</td>
+                            <td>${updatedChauffeurs.Nom ?? ''}</td>
+                            <td class="cell-FKDG" data-field="Groupe" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.Groupe?? ''}</span></td>
+                            <td class="cell-sd" data-field="StartDate" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.startDate ?? ''}</span></td>
+                            <td class="cell-dd" data-field="DeletedDate" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.deletedDate ?? ''}</span></td>
+                            <td class="cell-facturable" data-field="facturable" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.facturablePetitVehicule ?? ''}</span></td>
+                            <td class="cell-superviseur" data-field="superviseur" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.superviseur ?? ''}</span></td>
+                            <td class="cell-rapport" data-field="rapport" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.rapportIFTA ?? ''}</span></td>
+                            <td class="cell-pret" data-field="pret" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.pret ?? ''}</span></td>
+                            <td>${controls}</td>
+                          `;
+                          btn.dataset.editing = '0';
+                          showFlash('Modifications enregistrées.');
+                        }
+                      }
+                    } catch (fetchErr) {
+                      alert('Sauvegarde OK, mais erreur lors de la mise à jour de l\'affichage: ' + fetchErr.message);
+                    }
+                  
+                    btn.dataset.editing = '0';
+                    btn.textContent = 'Modifier';
+                    return;
+
+                }
+                catch(err) {
+                    alert('Erreur sauvegarde: ' + err.message);
+                  }
+                }
+              }
+            });
+          }
+          
+
+
+
+
+
+    // Init
+    (async function init() {
+      try {
+        await loadAll();
+        // Restore filter state from localStorage
+        try {
+          const savedSearch = localStorage.getItem('manual_filter_search');
+          const savedDispatchGroup = localStorage.getItem('manual_filter_dispatchGroup');
+          
+          if (savedSearch !== null) document.getElementById('f-search').value = savedSearch;
+          if (savedDispatchGroup !== null) document.getElementById('f-dispatchGroup').value = savedDispatchGroup;
+        } catch (e) {
+          // localStorage might be disabled
+        }
+        applyFilter();
+        setupRowSelection();
+        attachGlobalEnterSubmitHandler();
+        // Ajouter driver button handler
+        const addBtn = document.querySelector('.AdminAjouterChauffeur');
+        if (addBtn) addBtn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          try {
+            const operatorNo = (document.getElementById('operatorNo')?.value || '').trim();
+            const driverFirstName = (document.getElementById('driverFirstName')?.value || '').trim();
+            const driverLastName = (document.getElementById('driverLastName')?.value || '').trim();
+            const dispatchGroup = (document.getElementById('dispatchGroup')?.value || '').trim();
+            const startDate = (document.getElementById('startDate')?.value || '').trim();
+            const deletedDate = (document.getElementById('deletedDate')?.value || '').trim();
+            const facturablePetitVehicule = document.getElementById('facturablePetitVehicule')?.checked || false;
+            const rapportIFTA = document.getElementById('rapportIFTA')?.checked || false;
+            const pret = document.getElementById('pret')?.checked || false;
+            
+
+            if (!operatorNo || !driverFirstName || !driverLastName || dispatchGroup === "0" ||!startDate) 
+            {
+              alert('#opérateur, prénom, nom, dispatch group et date de début sont obligatoires');
+              return;
+            }
+
+            const payload = {
+              operatorNo: operatorNo,
+              firstName: driverFirstName,
+              lastName: driverLastName,
+              dispatchGroup: Number(dispatchGroup),
+              startDate: startDate,
+              deletedDate: deletedDate || null,
+              facturablePetitVehicule: facturablePetitVehicule || null,
+              rapportIFTA: rapportIFTA || null,
+              pret: pret || null
+            };
+            console.log("ADD DRIVER PAYLOAD", payload);
+            const res = await fetch('/api/admin/drivers/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const txt = await res.text(); throw new Error(txt || res.statusText);
+            }
+            try { sessionStorage.setItem('flash_cartes', 'Chauffeur ajouté.'); } catch(e){}
+            location.reload();
+          } catch (err) {
+            alert('Erreur ajout chauffeur: ' + err.message);
+          }
+        });
+        // Debounced search input
+        const debouncedFilter = debounce(applyFilter, 250);
+        document.getElementById('f-search').addEventListener('input', debouncedFilter);
+        document.getElementById('f-dispatchGroup').addEventListener('change', applyFilter);
+        // Reset filters button
+        document.getElementById('reset-filters').addEventListener('click', () => {
+          try {
+            localStorage.removeItem('manual_filter_search');
+            localStorage.removeItem('manual_filter_dispatchGroup');
+          } catch (e) {}
+          document.getElementById('f-search').value = '';
+          document.getElementById('f-dispatchGroup').value = '';
+          applyFilter();
+        });
+        
+        try {
+          const msg = sessionStorage.getItem('flash_cartes');
+          if (msg) {
+            showFlash(msg);
+            sessionStorage.removeItem('flash_cartes');
+          }
+        } catch (e) {}
+      } catch (e) {
+        alert('Erreur chargement: ' + e.message);
+      }
+    })();
+
+    function showFlash(msg) {
+      const d = document.createElement('div');
+      d.className = 'flash-success';
+      d.textContent = msg;
+      document.body.appendChild(d);
+      setTimeout(() => { d.classList.add('visible'); }, 10);
+      setTimeout(() => { d.classList.remove('visible'); setTimeout(() => d.remove(), 400); }, 3500);
+    }
+  </script>
+
+
+
+
+</body>
+</html>

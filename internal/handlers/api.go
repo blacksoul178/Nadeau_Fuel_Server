@@ -267,6 +267,364 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
+// Admin edit functions
+func adminDriversUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on AdmindriversUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	type reqBody struct {
+		OperatorNo              string `json:"operatorNo"`
+		DispatchGroup           int    `json:"dispatchGroup"`
+		StartDate               string `json:"startDate"`
+		DeletedDate             string `json:"deletedDate"`
+		FacturablePetitVehicule bool   `json:"facturablePetitVehicule"`
+		Superviseur             string `json:"superviseur"`
+		RapportIFTA             bool   `json:"rapportIFTA"`
+		Pret                    bool   `json:"pret"`
+		CSRF                    string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on AdmindriversUpdateHandler: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	// CSRF
+	var csrfCandidates []string
+	if h := r.Header.Get("X-CSRF-Token"); h != "" {
+		csrfCandidates = append(csrfCandidates, h)
+	}
+	if body.CSRF != "" {
+		csrfCandidates = append(csrfCandidates, body.CSRF)
+	}
+	if c, err := r.Cookie("csrf_token"); err == nil {
+		if c != nil && c.Value != "" {
+			csrfCandidates = append(csrfCandidates, c.Value)
+		}
+	}
+	var validated bool
+	for _, candidate := range csrfCandidates {
+		if csrfManager.ValidateToken(candidate) {
+			validated = true
+			break
+		}
+	}
+	if !validated {
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		logger.Info("Invalid CSRF token provided to AdmindriversUpdateHandler")
+		return
+	}
+
+	if strings.TrimSpace(body.OperatorNo) == "" || body.DispatchGroup <= 0 {
+		respondWithError(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on AdmindriversUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Update by operatorNo
+	updateQ := `UPDATE dbo.Drivers SET 
+	FK_DispatchGroup = @dg,
+	startDate = @startDate,
+	deletedDate = @deletedDate,
+	facturablePetitVehicule = @facturablePetitVehicule,
+	superviseur = @superviseur,
+	rapportIFTA = @rapportIFTA,
+	pret = @pret
+	WHERE operatorNo = @op;`
+	if _, err := tx.ExecContext(ctx,
+		updateQ,
+		sql.Named("dg", body.DispatchGroup),
+		sql.Named("op", strings.TrimSpace(body.OperatorNo)),
+		sql.Named("startDate", strings.TrimSpace(body.StartDate)),
+		sql.Named("deletedDate", strings.TrimSpace(body.DeletedDate)),
+		sql.Named("facturablePetitVehicule", body.FacturablePetitVehicule),
+		sql.Named("superviseur", strings.TrimSpace(body.Superviseur)),
+		sql.Named("rapportIFTA", body.RapportIFTA),
+		sql.Named("pret", body.Pret)); err != nil {
+		logger.Info("Exec error on AdmindriversUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on AdmindriversUpdateHandler: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Admin Updated driver: OperatorNo=%s dispatchGroup=%d stardDate=%s deletedDate=%s facturablePetitVehicule=%t superviseur=%s rapportIFTA=%t pret=%t", body.OperatorNo, body.DispatchGroup, body.StartDate, body.DeletedDate, body.FacturablePetitVehicule, body.Superviseur, body.RapportIFTA, body.Pret))
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+func adminAddDriverHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Parse request JSON (includes optional csrf token in body)
+	type reqBody struct {
+		OperatorNo              string `json:"operatorNo"`
+		FirstName               string `json:"firstName"`
+		LastName                string `json:"lastName"`
+		DispatchGroup           int    `json:"dispatchGroup"`
+		StartDate               string `json:"startDate"`
+		DeletedDate             string `json:"deletedDate"`
+		FacturablePetitVehicule bool   `json:"facturablePetitVehicule"`
+		RapportIFTA             bool   `json:"rapportIFTA"`
+		Pret                    bool   `json:"pret"`
+		CSRF                    string `json:"csrf,omitempty"`
+	}
+	var body reqBody
+
+	// Read raw body for diagnostics
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Info("ReadAll error on adminAddDriver: " + err.Error())
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	logger.Info("adminAddDriver raw body: " + string(b))
+	if err := json.Unmarshal(b, &body); err != nil {
+		logger.Info("JSON unmarshal error on adminAddDriver: " + err.Error() + " -- raw: " + string(b))
+		respondWithError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	session := GetSessionInfo(r)
+	user := "unknown"
+	if session != nil {
+		user = session.Username
+	}
+	logger.Info(fmt.Sprintf("admin %s ajoute le chauffeur: operatorNo=%s FirstName=%q LastName=%q dispatchGroup=%d startDate=%q deletedDate=%s facturablePetitVehicule=%t rapportIFTA=%t pret=%t", user, body.OperatorNo, body.FirstName, body.LastName, body.DispatchGroup, body.StartDate, body.DeletedDate, body.FacturablePetitVehicule, body.RapportIFTA, body.Pret))
+
+	// Determine CSRF token: header -> body -> cookie
+	csrf := r.Header.Get("X-CSRF-Token")
+	if csrf == "" && body.CSRF != "" {
+		csrf = body.CSRF
+	}
+	if csrf == "" {
+		if c, err := r.Cookie("csrf_token"); err == nil {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		respondWithError(w, http.StatusForbidden, "missing CSRF token")
+		return
+	}
+	if !csrfManager.ValidateToken(csrf) {
+		logger.Info("Invalid CSRF token provided to adminAddDriver")
+		respondWithError(w, http.StatusForbidden, "Token Invalid, Recharger la page")
+		return
+	}
+
+	// Generate and set a fresh token for subsequent requests
+	if newToken, err := csrfManager.GenerateToken(); err == nil {
+		csrfManager.SetTokenCookie(w, newToken)
+	} else {
+		logger.Info("Failed to generate CSRF token after adminAddDriver: " + err.Error())
+	}
+
+	if strings.TrimSpace(body.OperatorNo) == "" || strings.TrimSpace(body.FirstName) == "" {
+		respondWithError(w, http.StatusBadRequest, "invalid driver payload")
+		return
+	}
+	if body.StartDate == "" {
+		respondWithError(w, http.StatusBadRequest, "startDate required")
+		return
+	}
+
+	// Start transaction
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Info("BeginTx error on adminAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Insert driver and return new ID using OUTPUT
+	insertQ := `
+	SET NOCOUNT ON;
+	INSERT INTO dbo.Drivers (operatorNo, FirstName, LastName, FK_DispatchGroup, startDate, deletedDate, facturablePetitVehicule, rapportIFTA, pret)
+	OUTPUT INSERTED.id
+	VALUES (@operatorNo, @FirstName, @LastName, @FK_DispatchGroup, @startDate, @deletedDate, @facturablePetitVehicule, @RapportIFTA, @pret);
+	`
+	var newId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, insertQ,
+		sql.Named("operatorNo", body.OperatorNo),
+		sql.Named("FirstName", body.FirstName),
+		sql.Named("LastName", body.LastName),
+		sql.Named("FK_DispatchGroup", body.DispatchGroup),
+		sql.Named("startDate", body.StartDate),
+		sql.Named("deletedDate", body.DeletedDate),
+		sql.Named("facturablePetitVehicule", body.FacturablePetitVehicule),
+		sql.Named("RapportIFTA", body.RapportIFTA),
+		sql.Named("pret", body.Pret),
+	).Scan(&newId); err != nil {
+		logger.Info("Insert error on adminAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	logger.Info(fmt.Sprintf("adminAddDriver inserted id (tx): %v", newId))
+
+	// Verify insertion
+	var verifyId sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT TOP 1 id FROM dbo.Drivers WHERE operatorNo = @op ORDER BY id DESC`, sql.Named("op", body.OperatorNo)).Scan(&verifyId); err != nil {
+		if err == sql.ErrNoRows {
+			logger.Info("Verification select: no rows found after insert for operatorNo=" + body.OperatorNo)
+		} else {
+			logger.Info("Verification select error on adminAddDriver: " + err.Error())
+			respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+			return
+		}
+	} else {
+		logger.Info(fmt.Sprintf("Verification select found id: %v", verifyId))
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.Info("Commit error on adminAddDriver: " + err.Error())
+		respondWithError(w, http.StatusInternalServerError, "database error: "+err.Error())
+		return
+	}
+
+	res := map[string]interface{}{
+		"id":         nil,
+		"operatorNo": body.OperatorNo,
+		"firstName":  body.FirstName,
+		"lastName":   body.LastName,
+	}
+	if newId.Valid {
+		res["id"] = int(newId.Int64)
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+}
+func adminChauffeursAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Test query - get column info first
+	query := `
+SELECT
+    operatorNo,
+    FirstName,
+    LastName,
+    Groupe,
+	startDate,
+	deletedDate,
+	facturablePetitVehicule,
+	isBroker,
+	superviseur,
+	rapportIFTA, 
+	pret
+FROM dbo.Chauffeurs
+ORDER BY FirstName;
+`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on adminChauffeursAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		OperatorNo              string `json:"operatorNo"`
+		Nom                     string `json:"Nom"`
+		Groupe                  string `json:"Groupe"`
+		StartDate               string `json:"startDate"`
+		DeletedDate             string `json:"deletedDate"`
+		FacturablePetitVehicule bool   `json:"facturablePetitVehicule"`
+		IsBroker                bool   `json:"isBroker"`
+		Superviseur             string `json:"superviseur"`
+		RapportIFTA             bool   `json:"rapportIFTA"`
+		Pret                    bool   `json:"pret"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			opNo                    sql.NullString
+			firstName               sql.NullString
+			lastName                sql.NullString
+			grp                     sql.NullString
+			sd                      sql.NullString // Changed from sql.NullTime to sql.NullString
+			deletedDate             sql.NullString
+			facturablePetitVehicule sql.NullBool
+			isBroker                sql.NullBool
+			superviseur             sql.NullString
+			rapportIFTA             sql.NullBool
+			pret                    sql.NullBool
+		)
+		if err := rows.Scan(&opNo, &firstName, &lastName, &grp, &sd, &deletedDate, &facturablePetitVehicule, &isBroker, &superviseur, &rapportIFTA, &pret); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on adminChauffeursAllHandler: " + err.Error())
+			return
+		}
+
+		// Combine first and last names
+		nom := strings.TrimSpace(firstName.String + " " + lastName.String)
+
+		// Trim date to YYYY-MM-DD format (remove time portion if present)
+		startDate := sd.String
+		if len(startDate) > 10 {
+			startDate = startDate[:10]
+		}
+
+		out = append(out, rowOut{
+			OperatorNo:              opNo.String,
+			Nom:                     nom,
+			Groupe:                  grp.String,
+			StartDate:               startDate,
+			DeletedDate:             deletedDate.String,
+			IsBroker:                isBroker.Bool,
+			FacturablePetitVehicule: facturablePetitVehicule.Bool,
+			Superviseur:             superviseur.String,
+			RapportIFTA:             rapportIFTA.Bool,
+			Pret:                    pret.Bool,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on adminChauffeursAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
 // GETs fetch data
 func chauffeursAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -284,12 +642,19 @@ SELECT
     FirstName,
     LastName,
     Groupe,
-	isBroker
+	startDate,
+	deletedDate,
+	facturablePetitVehicule,
+	isBroker,
+	superviseur,
+	rapportIFTA, 
+	pret
 FROM dbo.Chauffeurs
-WHERE
+WHERE (
     deletedDate IS NULL
     OR LTRIM(RTRIM(deletedDate)) = ''
     OR UPPER(LTRIM(RTRIM(deletedDate))) IN ('NULL', 'NONE')
+	)
 ORDER BY FirstName;
 `
 
@@ -302,24 +667,34 @@ ORDER BY FirstName;
 	defer rows.Close()
 
 	type rowOut struct {
-		OperatorNo string `json:"operatorNo"`
-		Nom        string `json:"Nom"`
-		Groupe     string `json:"Groupe"`
-		StartDate  string `json:"startDate"`
-		IsBroker   bool   `json:"isBroker"`
+		OperatorNo              string `json:"operatorNo"`
+		Nom                     string `json:"Nom"`
+		Groupe                  string `json:"Groupe"`
+		StartDate               string `json:"startDate"`
+		DeletedDate             string `json:"deletedDate"`
+		FacturablePetitVehicule bool   `json:"facturablePetitVehicule"`
+		IsBroker                bool   `json:"isBroker"`
+		Superviseur             string `json:"superviseur"`
+		RapportIFTA             bool   `json:"rapportIFTA"`
+		Pret                    bool   `json:"pret"`
 	}
 	out := make([]rowOut, 0, 256)
 
 	for rows.Next() {
 		var (
-			opNo      sql.NullString
-			firstName sql.NullString
-			lastName  sql.NullString
-			grp       sql.NullString
-			sd        sql.NullString // Changed from sql.NullTime to sql.NullString
-			isBroker  sql.NullBool
+			opNo                    sql.NullString
+			firstName               sql.NullString
+			lastName                sql.NullString
+			grp                     sql.NullString
+			sd                      sql.NullString // Changed from sql.NullTime to sql.NullString
+			deletedDate             sql.NullString
+			facturablePetitVehicule sql.NullBool
+			isBroker                sql.NullBool
+			superviseur             sql.NullString
+			rapportIFTA             sql.NullBool
+			pret                    sql.NullBool
 		)
-		if err := rows.Scan(&opNo, &firstName, &lastName, &grp, &isBroker); err != nil {
+		if err := rows.Scan(&opNo, &firstName, &lastName, &grp, &sd, &deletedDate, &facturablePetitVehicule, &isBroker, &superviseur, &rapportIFTA, &pret); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on chauffeursAllHandler: " + err.Error())
 			return
@@ -335,11 +710,16 @@ ORDER BY FirstName;
 		}
 
 		out = append(out, rowOut{
-			OperatorNo: opNo.String,
-			Nom:        nom,
-			Groupe:     grp.String,
-			StartDate:  startDate,
-			IsBroker:   isBroker.Bool,
+			OperatorNo:              opNo.String,
+			Nom:                     nom,
+			Groupe:                  grp.String,
+			StartDate:               startDate,
+			DeletedDate:             deletedDate.String,
+			IsBroker:                isBroker.Bool,
+			FacturablePetitVehicule: facturablePetitVehicule.Bool,
+			Superviseur:             superviseur.String,
+			RapportIFTA:             rapportIFTA.Bool,
+			Pret:                    pret.Bool,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -439,6 +819,10 @@ SELECT Cardid
       ,DateReprise
       ,Active
       ,notes
+	  ,pret
+	  ,facturablePetitVehicule
+	  ,superviseur
+	  ,rapportIFTA
   FROM dbo.listCartes
   order by FirstName;
 `
@@ -452,36 +836,44 @@ SELECT Cardid
 	defer rows.Close()
 
 	type rowOut struct {
-		CardId            int    `json:"CardId"`
-		Nom               string `json:"Nom"`
-		IsBroker          bool   `json:"IsBroker"`
-		Nom_DispatchGroup string `json:"Nom_DispatchGroup"`
-		CardNumber        string `json:"CardNumber"`
-		NIP               string `json:"NIP"`
-		Expiration        string `json:"Expiration"`
-		OilCoName         string `json:"OilCoName"`
-		DateRemise        string `json:"DateRemise"`
-		DateReprise       string `json:"DateReprise"`
-		Active            bool   `json:"Active"`
-		Notes             string `json:"Notes"`
+		CardId                  int    `json:"CardId"`
+		Nom                     string `json:"Nom"`
+		IsBroker                bool   `json:"IsBroker"`
+		Nom_DispatchGroup       string `json:"Nom_DispatchGroup"`
+		CardNumber              string `json:"CardNumber"`
+		NIP                     string `json:"NIP"`
+		Expiration              string `json:"Expiration"`
+		OilCoName               string `json:"OilCoName"`
+		DateRemise              string `json:"DateRemise"`
+		DateReprise             string `json:"DateReprise"`
+		Active                  bool   `json:"Active"`
+		Notes                   string `json:"Notes"`
+		Pret                    bool   `json:"Pret"`
+		FacturablePetitVehicule bool   `json:"FacturablePetitVehicule"`
+		Superviseur             string `json:"Superviseur"`
+		RapportIFTA             bool   `json:"RapportIFTA"`
 	}
 	out := make([]rowOut, 0, 256)
 
 	for rows.Next() {
 		var (
-			CardId            sql.NullInt32
-			FirstName         sql.NullString
-			LastName          sql.NullString
-			IsBroker          sql.NullBool
-			Nom_DispatchGroup sql.NullString
-			CardNumber        sql.NullString
-			NIP               sql.NullString
-			Expiration        sql.NullTime
-			OilCoName         sql.NullString
-			DateRemise        sql.NullTime
-			DateReprise       sql.NullTime
-			Active            sql.NullBool
-			Notes             sql.NullString
+			CardId                  sql.NullInt32
+			FirstName               sql.NullString
+			LastName                sql.NullString
+			IsBroker                sql.NullBool
+			Nom_DispatchGroup       sql.NullString
+			CardNumber              sql.NullString
+			NIP                     sql.NullString
+			Expiration              sql.NullTime
+			OilCoName               sql.NullString
+			DateRemise              sql.NullTime
+			DateReprise             sql.NullTime
+			Active                  sql.NullBool
+			Notes                   sql.NullString
+			Pret                    sql.NullBool
+			FacturablePetitVehicule sql.NullBool
+			Superviseur             sql.NullString
+			RapportIFTA             sql.NullBool
 		)
 		if err := rows.Scan(
 			&CardId,
@@ -496,7 +888,11 @@ SELECT Cardid
 			&DateRemise,
 			&DateReprise,
 			&Active,
-			&Notes); err != nil {
+			&Notes,
+			&Pret,
+			&FacturablePetitVehicule,
+			&Superviseur,
+			&RapportIFTA); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on cartesAllHandler: " + err.Error())
 			return
@@ -534,8 +930,12 @@ SELECT Cardid
 					return ""
 				}
 			}(),
-			Active: Active.Bool,
-			Notes:  Notes.String,
+			Active:                  Active.Bool,
+			Notes:                   Notes.String,
+			Pret:                    Pret.Bool,
+			FacturablePetitVehicule: FacturablePetitVehicule.Bool,
+			Superviseur:             Superviseur.String,
+			RapportIFTA:             RapportIFTA.Bool,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -2483,6 +2883,7 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	type reqBody struct {
 		CardId      int     `json:"CardId"`
 		NIP         string  `json:"NIP"`
+		Expiration  *string `json:"Expiration"`
 		DateRemise  *string `json:"DateRemise"`
 		DateReprise *string `json:"DateReprise"`
 		Notes       *string `json:"Notes"`
@@ -2550,6 +2951,7 @@ func cartesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	updateQ := `
 UPDATE dbo.Cartes
 SET NIP = @nip,
+Expiration = TRY_CONVERT(date, @expiration, 120),
 	DateRemise = TRY_CONVERT(date, @dr, 120),
 	DateReprise = TRY_CONVERT(date, @dre, 120),
 	Notes = @notes
@@ -2594,6 +2996,7 @@ WHERE CardId = @cid;
 
 	if _, err := tx.ExecContext(ctx, updateQ,
 		sql.Named("nip", strings.TrimSpace(body.NIP)),
+		sql.Named("expiration", body.Expiration),
 		sql.Named("dr", drParam),
 		sql.Named("dre", dreParam),
 		sql.Named("notes", notesParam),
@@ -2611,6 +3014,10 @@ WHERE CardId = @cid;
 	}
 
 	// Build log values for dates (empty if nil)
+	expLog := ""
+	if body.Expiration != nil {
+		expLog = *body.Expiration
+	}
 	drLog := ""
 	dreLog := ""
 	notesLog := ""
@@ -2623,7 +3030,7 @@ WHERE CardId = @cid;
 	if body.Notes != nil {
 		notesLog = *body.Notes
 	}
-	logger.Info(fmt.Sprintf("User %s updated CardId=%d NIP=%s DateRemise=%s DateReprise=%s Notes=%s", user, body.CardId, body.NIP, drLog, dreLog, notesLog))
+	logger.Info(fmt.Sprintf("User %s updated: CardId=%d, NIP=%s, Expiration=%s, DateRemise=%s, DateReprise=%s, Notes=%s", user, body.CardId, body.NIP, expLog, drLog, dreLog, notesLog))
 
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }

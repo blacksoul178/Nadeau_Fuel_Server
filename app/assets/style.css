@@ -477,19 +477,22 @@ input[type="button"]:active {
   z-index: 10000;
 }
 .flash-success.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    
+ 
 .tabs {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-
-
 .tab-spacer {
   height: 20px;
   border-right: 2px dashed #8b8b8b;
   opacity: 0.6;
   margin: 0 14px;
+}
+
+input[type="checkbox"] {
+    transform: scale(1.5);
+    cursor: pointer;
+    margin-right: 6px;
 }

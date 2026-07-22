@@ -50,6 +50,14 @@ tr.rating-3 {
     color: inherit !important;
 }
 
+.text-preview {
+    cursor: help;
+    display: inline-block;
+    max-width: 320px;
+    white-space: normal;
+    word-break: break-word;
+}
+
 /* Original rating classes for other tables */
 .rating-1 {
     background-color: #8dd89d; /* green */
@@ -128,6 +136,7 @@ tr.rating-3 {
 
     const state = { data: [] };
     const syncState = { data: [] };
+    const PREVIEW_MAX_LENGTH = 300;
 
     
     function getLastSaturday() {
@@ -143,7 +152,7 @@ tr.rating-3 {
 
     // Fetch ALL transactions once (small table)
     async function loadAll() {
-      const res = await fetch('/api/transactions/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/transactions/allTransactions', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       state.data = await res.json();
     }
@@ -167,6 +176,26 @@ tr.rating-3 {
       return '';
     }
 
+    function buildPreviewCell(value, maxLength = PREVIEW_MAX_LENGTH) {
+      const cell = document.createElement('td');
+      cell.className = 'wrap';
+
+      const text = value == null ? '' : String(value);
+      const fullText = text.trim();
+      if (!fullText) {
+        cell.textContent = '';
+        return cell;
+      }
+
+      const previewText = fullText.length > maxLength ? fullText.slice(0, maxLength).trimEnd() + '...' : fullText;
+      const span = document.createElement('span');
+      span.className = 'text-preview';
+      span.textContent = previewText;
+      span.title = fullText;
+      cell.appendChild(span);
+      return cell;
+    }
+
     // Render transactions table
     function render(rows) {
       const tb = document.querySelector('#tbl tbody');
@@ -178,19 +207,32 @@ tr.rating-3 {
           tr.className = rowClass;
         }
 
-        tr.innerHTML = `
-          <td class="col-120">${r.RunName ?? ''}</td>
-          <td>${r.StartedAt ?? ''}</td>
-          <td>${r.FinishedAt ?? ''}</td>
-          <td>${r.Status ?? ''}</td>
-          <td class="wrap">${r.ErrorMessage ?? ''}</td>
-          <td>${r.TotalLines ?? ''}</td>
-          <td>${r.Imported ?? ''}</td>
-          <td>${r.Failures ?? ''}</td>
-          <td class="wrap">${r.Duplicates ?? ''}</td>
-          <td class="wrap">${r.Missing ?? ''}</td>
-          <td class="wrap">${r.OtherFailures ?? ''}</td>
-          `;
+        const cells = [
+          document.createElement('td'),
+          document.createElement('td'),
+          document.createElement('td'),
+          document.createElement('td'),
+          document.createElement('td'),
+          document.createElement('td'),
+          document.createElement('td'),
+          document.createElement('td'),
+          buildPreviewCell(r.Duplicates),
+          buildPreviewCell(r.Missing),
+          buildPreviewCell(r.OtherFailures)
+        ];
+
+        cells[0].className = 'col-120';
+        cells[0].textContent = r.RunName ?? '';
+        cells[1].textContent = r.StartedAt ?? '';
+        cells[2].textContent = r.FinishedAt ?? '';
+        cells[3].textContent = r.Status ?? '';
+        cells[4].className = 'wrap';
+        cells[4].textContent = r.ErrorMessage ?? '';
+        cells[5].textContent = r.TotalLines ?? '';
+        cells[6].textContent = r.Imported ?? '';
+        cells[7].textContent = r.Failures ?? '';
+
+        cells.forEach(cell => tr.appendChild(cell));
         // Add click listener to toggle selection
         tr.addEventListener('click', function() {
           this.classList.toggle('selected');
@@ -359,6 +401,11 @@ tr.rating-3 {
         const ImportTransBtn = document.querySelector('.importTrans-btn');
         if (ImportTransBtn) {
           ImportTransBtn.addEventListener('click', importTrans);
+        //   await loadAll();
+        //   await loadSyncStatus();
+        // let rows = state.data;
+        // render(rows);
+        // renderSyncTable(syncState.data);
         }
       } catch (e) {
         alert('Erreur de chargement: ' + e.message);

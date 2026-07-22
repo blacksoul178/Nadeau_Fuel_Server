@@ -15,7 +15,7 @@
 <main class="container">
     <!-- Ajout de Pétrolière -->
     <section class="panel">
-          <label for="Ajout Pétrolière">Ajout Pétrolière</label>
+          <b>Ajout Pétrolière</b>
           <div>
             <label for="oilCoName">Nom de la Pétrolière *</label>
             <input type="text" name="oilCoName" id="oilCoName" placeholder="ex.: Harnois">
@@ -63,7 +63,7 @@
 
     // Fetch ALL once (small table)
     async function loadAll() {
-      const res = await fetch('/api/petrolieres/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/petrolieres/allPetrolieres', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       state.data = await res.json();
     }

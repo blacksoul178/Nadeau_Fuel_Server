@@ -15,7 +15,7 @@
 <main class="container">
   Ajout de Cartes 
     <section class="panel">
-            <label for="Ajout de carte">Ajout de carte</label>
+            <b>Ajout de carte</b>
             <div>
                 <label for="driverName">Nom du chauffeur *</label>
                 <input name="driverName" id="driverName" list="driverList" placeholder="Tapez un nom..." autocomplete="off">
@@ -81,6 +81,7 @@
         <option value="TMC">TMC</option>
         <option value="GJF">GJF</option>
         <option value="MTA">MTA</option>
+        <option value="9001">9001</option>
       </select>
       </div>
       <div class="spacer"></div>
@@ -118,10 +119,9 @@
     
     const state = { data: [],
       filtered: [],
-      debounceTimer: null
-     };
-
-
+      debounceTimer: null,
+      validDriverNames: new Set()
+    }
 
      
 
@@ -136,6 +136,7 @@
       // Collect unique names and sort
       const names = Array.from(new Set((drivers || []).map(d => (d.operatorNo || '').trim()).filter(n => n)));
       names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+      state.validDriverNames = new Set(names.map(n => n.toLowerCase()));
       for (const name of names) {
         const opt = document.createElement('option');
         opt.value = name;
@@ -147,7 +148,7 @@
     // Populate oil company datalist from API
     async function populateOilCoList() {
       try {
-        const res = await fetch('/api/petrolieres/all', { headers: { 'Accept': 'application/json' } });
+        const res = await fetch('/api/petrolieres/allPetrolieres', { headers: { 'Accept': 'application/json' } });
         if (!res.ok) return;
         const list = await res.json();
         const dl = document.getElementById('oilCoList');
@@ -163,9 +164,9 @@
 
     async function populateDispatchGroupList() {
       try {
-        const res = await fetch('/api/DispatchGroup/all', { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) return;
-        const list = await res.json();
+        // const res = await fetch('/api/DispatchGroup/all', { headers: { 'Accept': 'application/json' } });
+        // if (!res.ok) return;
+        // const list = await res.json();
         const dl = document.getElementById('DispatchGroupList');
         if (!dl) return;
         dl.innerHTML = '';
@@ -204,12 +205,12 @@
         if (event.key !== 'Enter' || event.shiftKey) return;
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
-        if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes, .inp-group')) return;
+        if (!target.matches('.inp-nip, .inp-exp, .inp-dr, .inp-dre, .inp-notes, .inp-group')) return;
         event.preventDefault();
         btn.click();
       };
       row._enterSubmitHandler = handler;
-      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes', '.inp-group'].forEach(selector => {
+      ['.inp-nip', '.inp-exp', '.inp-dr', '.inp-dre', '.inp-notes', '.inp-group'].forEach(selector => {
         row.querySelectorAll(selector).forEach(el => el.addEventListener('keydown', handler));
       });
     }
@@ -217,7 +218,7 @@
     function detachEnterSubmitFromRow(row) {
       if (!row || !row._enterSubmitHandler) return;
       const handler = row._enterSubmitHandler;
-      ['.inp-nip', '.inp-dr', '.inp-dre', '.inp-notes', '.inp-group'].forEach(selector => {
+      ['.inp-nip', '.inp-exp', '.inp-dr', '.inp-dre', '.inp-notes', '.inp-group'].forEach(selector => {
         row.querySelectorAll(selector).forEach(el => el.removeEventListener('keydown', handler));
       });
       delete row._enterSubmitHandler;
@@ -228,7 +229,7 @@
         if (event.key !== 'Enter' || event.shiftKey) return;
           const target = event.target;
           if (!(target instanceof HTMLElement)) return;
-          if (!target.matches('.inp-nip, .inp-dr, .inp-dre, .inp-notes, .inp-group')) return;
+          if (!target.matches('.inp-nip, .inp-exp, .inp-dr, .inp-dre, .inp-notes, .inp-group')) return;
         const row = target.closest('tr');
         if (!row) return;
         const btn = row.querySelector('.btn-edit[data-editing="1"]');
@@ -241,14 +242,14 @@
 
     // Fetch ALL once (small table)
     async function loadAll() {
-      const res = await fetch('/api/cartesPret/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/cartesPret/allCartesPret', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       
 
       state.data = await res.json();
       // Fetch driver names from /api/chauffeurs/all for the datalist
       try {
-        const driversRes = await fetch('/api/chauffeurs/pret', { headers: { 'Accept': 'application/json' } });
+        const driversRes = await fetch('/api/chauffeurs/chauffeursPret', { headers: { 'Accept': 'application/json' } });
         if (driversRes.ok) {
           const drivers = await driversRes.json();
           populateDriverNameSelect(drivers);
@@ -306,10 +307,10 @@
 
         // Save filter state to localStorage
         try {
-          localStorage.setItem('cartes_filter_search', document.getElementById('f-search').value || '');
-          localStorage.setItem('cartes_filter_actif', document.getElementById('f-actif').value || '');
-          localStorage.setItem('cartes_filter_broker', document.getElementById('f-broker').value || '');
-          localStorage.setItem('cartes_filter_dispatchGroup', document.getElementById('f-dispatchGroup').value || '');
+          localStorage.setItem('cartesPret_filter_search', document.getElementById('f-search').value || '');
+          localStorage.setItem('cartesPret_filter_actif', document.getElementById('f-actif').value || '');
+          localStorage.setItem('cartesPret_filter_broker', document.getElementById('f-broker').value || '');
+          localStorage.setItem('cartesPret_filter_dispatchGroup', document.getElementById('f-dispatchGroup').value || '');
         } catch (e) {
           // localStorage might be disabled
         }
@@ -358,7 +359,7 @@
                 <td data-field="CardNumber">${r.CardNumber ?? ''}</td>
                 <td class="cell-nip" data-field="NIP" data-cardid="${r.CardId}"><span class="val">${r.NIP ?? ''}</span></td>
                 <td data-field="OilCoName">${r.OilCoName ?? ''}</td>
-                <td data-field="Expiration">${r.Expiration ?? ''}</td>
+                <td class="cell-exp" data-field="Expiration" data-cardid="${r.CardId}"><span class="val">${r.Expiration ?? ''}</span></td>
                 <td class="cell-dr" data-field="DateRemise" data-cardid="${r.CardId}"><span class="val">${r.DateRemise ?? ''}</span></td>
                 <td class="cell-dre" data-field="DateReprise" data-cardid="${r.CardId}"><span class="val">${r.DateReprise ?? ''}</span></td>
                 <td data-field="Active">${r.Active ?? ''}</td>
@@ -400,6 +401,7 @@
                 const cardId = btn.dataset.cardid;
                 const row = btn.closest('tr');
                 const nipCell = row.querySelector('.cell-nip .val');
+                const expCell = row.querySelector('.cell-exp .val');
                 const drCell = row.querySelector('.cell-dr .val');
                 const dreCell = row.querySelector('.cell-dre .val');
                 const notesCell = row.querySelector('td[data-field="Notes"]');
@@ -408,6 +410,7 @@
                 if (!isEditing) {
                   // switch to inputs
                   const nipVal = nipCell ? nipCell.textContent.trim() : '';
+                  let expVal = expCell ? expCell.textContent.trim() : '';
                   let drVal = drCell ? drCell.textContent.trim() : '';
                   let dreVal = dreCell ? dreCell.textContent.trim() : '';
                   // Convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD for input type="date"
@@ -432,12 +435,16 @@
                     const _t = new Date();
                     return `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, '0')}-${String(_t.getDate()).padStart(2, '0')}`;
                   }
+                  const expValDate = toDateInput(expVal) || '';
                   const drValDate = toDateInput(drVal) || getToday();
                   const dreValDate = toDateInput(dreVal) || '';
                   const notesVal = notesCell ? notesCell.textContent.trim() : '';
 
                   if (nipCell) {
                     nipCell.parentElement.innerHTML = `<input class="inp-nip" autocomplete="off" value="${nipVal}">`;
+                  }
+                  if (expCell) {
+                    expCell.parentElement.innerHTML = `<input class="inp-exp" type="date" autocomplete="off" value="${expValDate}">`;
                   }
                   if (drCell) {
                     drCell.parentElement.innerHTML = `<input class="inp-dr" type="date" autocomplete="off" value="${drValDate}">`;
@@ -483,6 +490,7 @@
                   detachEnterSubmitFromRow(row);
                   // save
                   const nip = row.querySelector('.inp-nip')?.value.trim() || '';
+                  let exp = row.querySelector('.inp-exp')?.value.trim() || '';
                   const newGroup = row.querySelector('.inp-group')?.value || '';
                   const operatorNo = (row.querySelector('td')?.textContent || '').trim();
                   let drRaw = row.querySelector('.inp-dr')?.value;
@@ -517,14 +525,14 @@
                     const res = await fetch('/api/cartes/update', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-                      body: JSON.stringify({ CardId: Number(cardId), NIP: nip, DateRemise: dr, DateReprise: dre, Notes: notes })
+                      body: JSON.stringify({ CardId: Number(cardId), NIP: nip, Expiration: exp, DateRemise: dr, DateReprise: dre, Notes: notes })
                     });
                     if (!res.ok) {
                       const txt = await res.text(); throw new Error(txt || res.statusText);
                     }
                     // Fetch updated data for this card and re-render row
                     try {
-                      const carteRes = await fetch('/api/cartesPret/all', { headers: { 'Accept': 'application/json' } });
+                      const carteRes = await fetch('/api/cartesPret/allCartesPret', { headers: { 'Accept': 'application/json' } });
                       if (carteRes.ok) {
                         const allCartes = await carteRes.json();
                         const updatedCarte = allCartes.find(c => c.CardId === Number(cardId));
@@ -538,7 +546,7 @@
                             <td data-field="CardNumber">${updatedCarte.CardNumber ?? ''}</td>
                             <td class="cell-nip" data-field="NIP" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.NIP ?? ''}</span></td>
                             <td data-field="OilCoName">${updatedCarte.OilCoName ?? ''}</td>
-                            <td data-field="Expiration">${updatedCarte.Expiration ?? ''}</td>
+                            <td class="cell-exp" data-field="Expiration" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.Expiration ?? ''}</span></td>
                             <td class="cell-dr" data-field="DateRemise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateRemise ?? ''}</span></td>
                             <td class="cell-dre" data-field="DateReprise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateReprise ?? ''}</span></td>
                             <td data-field="Active">${updatedCarte.Active ?? ''}</td>
@@ -635,10 +643,10 @@
         await loadAll();
         // Restore filter state from localStorage
         try {
-          const savedSearch = localStorage.getItem('cartes_filter_search');
-          const savedActif = localStorage.getItem('cartes_filter_actif');
-          const savedBroker = localStorage.getItem('cartes_filter_broker');
-          const savedDispatchGroup = localStorage.getItem('cartes_filter_dispatchGroup');
+          const savedSearch = localStorage.getItem('cartesPret_filter_search');
+          const savedActif = localStorage.getItem('cartesPret_filter_actif');
+          const savedBroker = localStorage.getItem('cartesPret_filter_broker');
+          const savedDispatchGroup = localStorage.getItem('cartesPret_filter_dispatchGroup');
           
           if (savedSearch !== null) document.getElementById('f-search').value = savedSearch;
           if (savedActif !== null) document.getElementById('f-actif').value = savedActif;
@@ -668,6 +676,10 @@
 
             if (!driverName || !cardNumber || !NIP) {
               alert('driverName, cardNumber et NIP sont obligatoires');
+              return;
+            }
+            if (!state.validDriverNames.has(driverName.toLowerCase())) {
+              alert('Le chauffeur doit être sélectionné dans la liste des chauffeurs disponibles');
               return;
             }
             if (!oilCoName) {
@@ -708,10 +720,10 @@
         // Reset filters button
         document.getElementById('reset-filters').addEventListener('click', () => {
           try {
-            localStorage.removeItem('cartes_filter_search');
-            localStorage.removeItem('cartes_filter_actif');
-            localStorage.removeItem('cartes_filter_broker');
-            localStorage.removeItem('cartes_filter_dispatchGroup');
+            localStorage.removeItem('cartesPret_filter_search');
+            localStorage.removeItem('cartesPret_filter_actif');
+            localStorage.removeItem('cartesPret_filter_broker');
+            localStorage.removeItem('cartesPret_filter_dispatchGroup');
           } catch (e) {}
           document.getElementById('f-search').value = '';
           document.getElementById('f-actif').value = '';

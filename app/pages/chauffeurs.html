@@ -62,7 +62,7 @@
 
     // Fetch ALL once (small table)
     async function loadAll() {
-      const res = await fetch('/api/chauffeurs/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/chauffeurs/allChauffeurs', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       state.data = await res.json();
     }

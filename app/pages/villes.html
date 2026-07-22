@@ -57,7 +57,7 @@ function getCSRF() {
 
 // ---------------- LOAD DATA ----------------
 async function loadAll() {
-  const res = await fetch('/api/villes/all', {
+  const res = await fetch('/api/villes/allVilles', {
     headers: { 'Accept': 'application/json' }
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);

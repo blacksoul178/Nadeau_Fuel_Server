@@ -35,7 +35,7 @@
     const state = { data: [] };
 
     async function loadAll() {
-      const res = await fetch('/api/rampe/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/rampe/allRampe', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       state.data = await res.json();
     }

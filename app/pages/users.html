@@ -192,7 +192,7 @@
             console.log('loadAll() called');
             try {
                 console.log('Fetching from /api/admin/users/all...');
-                const res = await fetch('/api/admin/users/all', { headers: { 'Accept': 'application/json' } });
+                const res = await fetch('/api/admin/users/allUsers', { headers: { 'Accept': 'application/json' } });
                 console.log('Response status:', res.status, res.ok);
                 if (!res.ok) {
                     const errText = await res.text();

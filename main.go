@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-var TEST = false
+var TEST = true
 
 func main() {
 	// 1- Load app configs

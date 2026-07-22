@@ -553,6 +553,37 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 	}
 }
+func manualHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsAdmin(r) {
+		http.Redirect(w, r, "/home", http.StatusSeeOther)
+		return
+	}
+
+	session := GetSessionInfo(r)
+
+	// Generate fresh CSRF token
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     IsAdmin(r),
+		"IsSuperUser": session.IsSuperUser,
+		"CSRFToken":   token,
+	}
+
+	if err := tplManual.Execute(w, data); err != nil {
+		logger.Info("Error executing manual template: " + err.Error())
+		http.Error(w, "Server error", http.StatusInternalServerError)
+	}
+}
 func villesHandler(w http.ResponseWriter, r *http.Request) {
 	session := GetSessionInfo(r)
 	if session == nil {

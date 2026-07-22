@@ -13,14 +13,14 @@
 <main class="container">
     <!-- Ajout de chauffeur broker -->
     <section class="panel">
-          <label for="Ajout Chauffeur">Ajout Chauffeur Broker</label>
+          <b>jout Chauffeur Broker</b>
           <div>
-            <label for="BrokerCo">Compagnie broker</label>
+            <b>Compagnie broker</b>
             <select name="BrokerCo" id="brokerCo">
             </select>
           </div>
           <div>
-            <label for="Compagnie facturable">Compagnie facturable</label>
+           <b>Compagnie facturable</b>
             <select name="Compagnie Facturable" id="dispatchGroup">
               <option value="1">TGN</option>
               <option value="2">TMC</option>
@@ -29,7 +29,7 @@
             </select>
             </div>
             <div>
-            <label for="Date de début">Date de début</label>
+            <b>Date de début</b>
           <input type="date" name="dateDeDépart" id="startDate">
           </div>
           <button type="submit" class="AjouterChauffeur">Ajouter</button>
@@ -40,17 +40,17 @@
 <main class="container">
     <!-- Ajout de compagnie broker -->
     <section class="panel">
-          <label for="Ajout Compagnie Broker">Ajout Compagnie Broker</label>
+          <b>Ajout Compagnie Broker</b>
           <div>
-            <label for="f-addBrokerCoCommonName">Nom Commmun*</label>
+            <b>Nom Commmun*</b>
             <input type="text" id="addBrokerCoCommonName" placeholder="ex.: Robert Transport">
           </div>
           <div>
-            <label for="f-addBrokerCoLegalName">Nom Legal*</label>
+            <b>Nom Legal*</b>
             <input type="text" id="addBrokerCoLegalName" placeholder="ex.: 1234-5678 Québec Inc.">
             </div>
             <div>
-            <label for="f-addBrokerCoAcomba">Acomba(optionel)</label>
+            <b>Acomba(optionel)</b>
             <input type="text" id="addBrokerCoAcomba" placeholder="ex.: ABC100">
           </div>
           <button type="submit" class="AjouterBrokerCo">Ajouter</button>
@@ -92,7 +92,7 @@
 
     // Fetch ALL once (small table)
     async function loadAll() {
-      const res = await fetch('/api/brokers/all', { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/brokers/allBrokers', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
       state.data = await res.json();
 
