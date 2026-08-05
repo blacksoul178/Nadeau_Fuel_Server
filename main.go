@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-var TEST = true
+var TEST = false // Set to true for testing, false for production
 
 func main() {
 	// 1- Load app configs

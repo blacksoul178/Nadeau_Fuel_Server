@@ -134,7 +134,7 @@
       list.innerHTML = '';
 
       // Collect unique names and sort
-      const names = Array.from(new Set((drivers || []).map(d => (d.operatorNo || '').trim()).filter(n => n)));
+      const names = Array.from(new Set((drivers || []).map(d => (d.Nom || '').trim()).filter(n => n)));
       names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
       state.validDriverNames = new Set(names.map(n => n.toLowerCase()));
       for (const name of names) {

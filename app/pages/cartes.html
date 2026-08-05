@@ -136,6 +136,10 @@
 
       // Collect unique names and sort
       const names = Array.from(new Set((drivers || []).map(d => (d.Nom || '').trim()).filter(n => n)));
+      state.validDriverNames = new Set(
+        names.map(n => n.toLowerCase())
+      );
+
       names.sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
       for (const name of names) {
         const opt = document.createElement('option');
@@ -624,6 +628,12 @@
               alert('driverName, cardNumber et NIP sont obligatoires');
               return;
             }
+            
+            if (!state.validDriverNames.has(driverName.toLowerCase())) {
+              alert('Le chauffeur doit être sélectionné dans la liste des chauffeurs disponibles');
+              return;
+            }
+
             if (!oilCoName) {
               alert('Pétrolière (oilCoName) est obligatoire');
               return;

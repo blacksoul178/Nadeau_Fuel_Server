@@ -348,7 +348,7 @@ func adminDriversUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	deletedDate = @deletedDate,
 	facturablePetitVehicule = @facturablePetitVehicule,
 	superviseur = @superviseur,
-	rapportIFTA = @rapportIFTA,
+	RapportIFTA = @rapportIFTA,
 	pret = @pret
 	WHERE operatorNo = @op;`
 	if _, err := tx.ExecContext(ctx,
@@ -650,7 +650,7 @@ SELECT
 	rapportIFTA, 
 	pret
 FROM dbo.Chauffeurs
-WHERE (
+WHERE (pret = 0 or pret is null) and (
     deletedDate IS NULL
     OR LTRIM(RTRIM(deletedDate)) = ''
     OR UPPER(LTRIM(RTRIM(deletedDate))) IN ('NULL', 'NONE')
@@ -742,7 +742,7 @@ func chauffeursPretHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-select operatorNo, Groupe
+select operatorNo, FirstName, LastName, Groupe
 FROM dbo.chauffeurs d
 WHERE d.pret = 1
         AND NOT EXISTS (
@@ -765,23 +765,28 @@ ORDER BY FirstName;
 
 	type rowOut struct {
 		OperatorNo string `json:"operatorNo"`
+		Nom        string `json:"Nom"`
 		Groupe     string `json:"Groupe"`
 	}
 	out := make([]rowOut, 0, 256)
 
 	for rows.Next() {
 		var (
-			opNo sql.NullString
-			grp  sql.NullString
+			opNo      sql.NullString
+			FirstName sql.NullString
+			LastName  sql.NullString
+			grp       sql.NullString
 		)
-		if err := rows.Scan(&opNo, &grp); err != nil {
+		if err := rows.Scan(&opNo, &FirstName, &LastName, &grp); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on chauffeursPretHandler: " + err.Error())
 			return
 		}
+		Nom := strings.TrimSpace(FirstName.String + " " + LastName.String)
 
 		out = append(out, rowOut{
 			OperatorNo: opNo.String,
+			Nom:        Nom,
 			Groupe:     grp.String,
 		})
 	}
@@ -2752,6 +2757,7 @@ func cartesAddHandler(w http.ResponseWriter, r *http.Request) {
 		SELECT id FROM dbo.Drivers 
 		WHERE LTRIM(RTRIM(FirstName + ' ' + ISNULL(LastName, ''))) = @name
 		   OR FirstName = @name
+		   OR operatorNo = @name
 	`, sql.Named("name", strings.TrimSpace(body.DriverName))).Scan(&driverId); err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusBadRequest, "driver not found")
