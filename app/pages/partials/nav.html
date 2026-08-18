@@ -1,5 +1,7 @@
 {{define "pageTabs"}}
 <nav class="tabs">
+    <a href="/bulletin" class="tab">Bulletin</a>
+    {{ if not .IsReports }}
     <a href="/chauffeurs" class="tab">Chauffeurs</a>
     <a href="/cartes" class="tab">Cartes</a>
     <a href="/brokers" class="tab">Compagnies Broker</a>
@@ -15,6 +17,7 @@
     <a href="/villes" class="tab">Villes</a>
     <a href="/rampe" class="tab">Prix à la rampe</a>
     <a href="/cartesPret" class="tab">Cartes de prêt</a>
+    {{end}}
     {{end}}
 </nav>
 <script>

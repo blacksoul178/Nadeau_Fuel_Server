@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel'O'Matic - bulletin</title>
+    <link rel="stylesheet" href="/assets/style.css">
+<style>
+  :root {
+    color-scheme: dark;
+
+    /* Main colors from your second stylesheet */
+    --paper: #181b22;
+    --card: #464444;
+
+    /* Text */
+    --ink: #ffffff;
+    --ink-soft: #d1d5db;
+
+    /* Borders */
+    --line: #04070c;
+
+    /* Accent */
+    --accent: #0d8bff;
+    --accent-soft: #0b1f33;
+
+    /* Score colors */
+    --score-90-bg: #3c9f5d;
+    --score-90-fg: #ffffff;
+
+    --score-80-bg: #d7ecc7;
+    --score-80-fg: #35502a;
+
+    --score-70-bg: #f3b9a6;
+    --score-70-fg: #6b2d1c;
+
+    --score-low-bg: #e5484d;
+    --score-low-fg: #ffffff;
+
+    --score-empty-bg: #666666;
+    --score-empty-fg: #ffffff;
+}
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 10px;
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-size: 16px;
+  }
+  header {
+    background: var(--card);
+    padding: 10px 20px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+
+
+  header .title-block {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+
+  header .route-strip {
+    width: 46px;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg,
+      var(--score-low-bg) 0%,
+      var(--score-70-bg) 33%,
+      var(--score-80-bg) 66%,
+      var(--score-90-bg) 100%);
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 28px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+
+  .controls label {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  select {
+    padding: 7px 10px;
+    border: 1px solid #45484d;
+    border-radius: 6px;
+    background: #333;
+    color: #ffffff;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+select:focus {
+    outline: none;
+    background: #404040;
+}
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .tab {
+    font-size: 14px;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #111827;
+    font-weight: 600;
+}
+
+.tab:hover {
+    background: #f3f4f6;
+}
+
+.tab.active {
+    background: #0b1f33;
+    color: #ffffff;
+    border-color: #0b1f33;
+}
+
+  main {
+    padding: 20px 28px 40px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+
+  .legend span.chip {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(20, 24, 33, 0.06);
+  }
+
+  thead th {
+    font-size: 14px;
+    background: #464444;
+    color: #ffffff;
+    border-bottom: 1px solid #04070c;
+}
+  tbody tr:nth-child(odd) {
+    background: #2a2a2a;
+}
+
+tbody tr:nth-child(even) {
+    background: #3a3a3a;
+}
+
+tbody tr:hover {
+    background: #4a6fa5;
+}
+
+  thead th.sorted::after {
+    content: " ▾";
+    color: var(--accent);
+  }
+
+  thead th.sorted.asc::after {
+    content: " ▴";
+  }
+
+  tbody td {
+    font-size: 15px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  td.nom {
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  td.score {
+    text-align: center;
+    font-weight: 700;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    border-radius: 4px;
+  }
+
+  .status-line {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-top: 12px;
+  }
+
+  .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: var(--ink-soft);
+    background: var(--card);
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+ {{template "header" .}}
+<header>
+  <div class="title-block">
+    <div class="route-strip"></div>
+    <h1>Pointage — Chauffeurs</h1>
+  </div>
+</header>
+ 
+<div class="controls">
+  <label for="companyFilter">Compagnie</label>
+  <select id="companyFilter"></select>
+ 
+  <div class="tabs">
+    <button class="tab active" data-view="recent">4 dernières semaines</button>
+    <button class="tab" data-view="history">Historique complet</button>
+  </div>
+ 
+  <div class="display-tabs">
+    <button class="tab active" data-display="table">Tableau</button>
+    <button class="tab" data-display="chart">Graphique</button>
+  </div>
+</div>
+ 
+<main>
+  <div class="legend">
+    <span><span class="chip" style="background:var(--score-90-bg)"></span>90 +</span>
+    <span><span class="chip" style="background:var(--score-80-bg)"></span>80 – 89,99</span>
+    <span><span class="chip" style="background:var(--score-70-bg)"></span>70 – 79,99</span>
+    <span><span class="chip" style="background:var(--score-low-bg)"></span>1 – 69,99</span>
+    <span><span class="chip" style="background:var(--score-empty-bg)"></span>Vide</span>
+  </div>
+ 
+  <div id="tableWrap">
+    <div class="empty-state">Chargement…</div>
+  </div>
+ 
+  <div id="chartWrap">
+    <canvas id="scoreChart"></canvas>
+    <div class="chart-note">
+      Les chauffeurs sans pointage une semaine donnée sont exclus du calcul de cette semaine (le % est calculé sur ceux qui ont un score).
+    </div>
+  </div>
+ 
+  <div class="status-line" id="statusLine"></div>
+</main>
+ 
+<script src="/chart.umd.min.js"></script>
+<script>
+
+    // fetch coach reports data
+    async function get_monthly_bulletin() {
+      try {
+        const res = await fetch('/api/bulletin/monthly', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const monthly = await res.json();
+      } catch (e) { /* ignore */ }
+    }
+    async function get_all_bulletin() {
+      try {
+        const res = await fetch('/api/bulletin/all', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const monthly = await res.json();
+      } catch (e) { /* ignore */ }
+    }
+
+
+/* ==========================================================================
+   CONTRAT JSON ATTENDU DU SERVEUR GO
+   --------------------------------------------------------------------------
+   GET /api/performance?compagnie=<nom|__ALL__>
+
+   {
+     "compagnies": ["Compagnie A", "Compagnie B"],
+     "semaines": ["2026-06-07", "2026-06-14", "2026-06-21", "2026-06-28"],
+     "chauffeurs": [
+       {
+         "nom": "Dany Tessier",
+         "compagnie": "Compagnie A",
+         "scores": { "2026-06-07": 95, "2026-06-14": 100, "2026-06-21": null, "2026-06-28": 98 }
+       },
+       ...
+     ]
+   }
+
+   - "semaines" est la liste ordonnée (chronologique) des colonnes à afficher.
+     Pour la vue "4 dernières semaines", envoyer seulement 4 entrées.
+     Pour "Historique complet", envoyer toutes les semaines disponibles.
+   - "scores" : null ou absent = case "Vide" (grise).
+   - Les noms de semaines peuvent être des dates ISO ou des libellés du genre
+     "Semaine du 14-06-20" — ce qui est affiché en en-tête, c'est la chaîne
+     telle quelle. Le tri chronologique se fait sur l'ORDRE du tableau, pas
+     sur le texte.
+   ========================================================================== */
+
+const API_ENDPOINTS = {
+  recent: "/api/bulletin/monthly",
+  history: "/api/bulletin/all" // TODO: remplacer par l'endpoint historique complet
+};
+
+// Noms des champs JSON renvoyés par le serveur Go pour le détail du score.
+// Si les clés réelles diffèrent (ex: "SecuriteTotal" au lieu de la chaîne
+// avec accents/espaces), c'est ICI qu'il faut les ajuster — rien d'autre
+// à toucher ailleurs dans le fichier.
+const BREAKDOWN_FIELDS = {
+  securite:     "SécuritéTotal",
+  acceleration: "AccélérationsTotal",
+  deceleration: "DécélérationsTotal",
+  arret:        "ArrêtsTotal"
+};
+const BREAKDOWN_LABELS = {
+  securite:     "Sécurité",
+  acceleration: "Accélération",
+  deceleration: "Décélérations",
+  arret:        "Arrêt"
+};
+ 
+// Nombre de semaines conservées pour la vue "4 dernières semaines" — au cas
+// où l'endpoint renverrait plus large que 4 semaines.
+const RECENT_WEEKS_COUNT = 4;
+ 
+function formatWeekLabel(iso) {
+  const d = new Date(iso);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}`;
+}
+ 
+// Transforme le tableau plat reçu de l'API (une ligne par chauffeur/semaine)
+// en la structure { compagnies, semaines, semaineLabels, chauffeurs } que
+// le reste de la page consomme.
+function transformRecords(records) {
+  const driversMap = new Map();
+  const semainesSet = new Set();
+  const companiesSet = new Set();
+ 
+  records.forEach(r => {
+    const compagnie = (r.DispatchGroup && r.DispatchGroup.trim() !== "")
+      ? r.DispatchGroup
+      : "Sans groupe";
+    companiesSet.add(compagnie);
+ 
+    const semaineKey = r.Semaine; // clé ISO, sert au tri chronologique
+    semainesSet.add(semaineKey);
+ 
+    const driverKey = r.Nom;
+    if (!driversMap.has(driverKey)) {
+      driversMap.set(driverKey, {
+        nom: r.Nom,
+        compagnie,
+        poste: r.Poste || "",
+        scores: {}
+      });
+    }
+ 
+    const parsed = parseFloat(r.ScoreMAJ);
+    const shunt = r.ScoreMAJ_Shunt === 1 || r.ScoreMAJ_Shunt === "1" || r.ScoreMAJ_Shunt === true;
+
+    const breakdown = {};
+    Object.keys(BREAKDOWN_FIELDS).forEach(key => {
+      const raw = parseFloat(r[BREAKDOWN_FIELDS[key]]);
+      breakdown[key] = isNaN(raw) ? null : raw;
+    });
+
+    driversMap.get(driverKey).scores[semaineKey] = {
+      value: isNaN(parsed) ? null : parsed,
+      shunt,
+      breakdown
+    };
+  });
+ 
+  const semaines = Array.from(semainesSet).sort(); // tri chronologique (ISO)
+  const semaineLabels = {};
+  semaines.forEach(s => { semaineLabels[s] = formatWeekLabel(s); });
+ 
+  return {
+    compagnies: Array.from(companiesSet).sort(),
+    semaines,
+    semaineLabels,
+    chauffeurs: Array.from(driversMap.values())
+  };
+}
+ 
+let state = {
+  view: "recent",
+  compagnie: "__ALL__",
+  display: "table"
+};
+ 
+// Couleurs des 4 paliers, dans l'ordre d'empilement du graphique (du bas vers le haut).
+const BUCKET_ORDER = ["low", "b70", "b80", "b90"];
+const BUCKET_LABELS = {
+  low: "1 – 69,99",
+  b70: "70 – 79,99",
+  b80: "80 – 89,99",
+  b90: "90 +"
+};
+const BUCKET_COLORS = {
+  low: "#e5484d",
+  b70: "#e8886a",
+  b80: "#a8d488",
+  b90: "#3c9f5d"
+};
+ 
+let chartInstance = null;
+ 
+function scoreClass(v) {
+  if (v === null || v === undefined) return "empty";
+  if (v >= 90) return "b90";
+  if (v >= 80) return "b80";
+  if (v >= 70) return "b70";
+  return "low";
+}
+ 
+const SCORE_STYLES = {
+  b90:   { bg: "var(--score-90-bg)",   fg: "var(--score-90-fg)" },
+  b80:   { bg: "var(--score-80-bg)",   fg: "var(--score-80-fg)" },
+  b70:   { bg: "var(--score-70-bg)",   fg: "var(--score-70-fg)" },
+  low:   { bg: "var(--score-low-bg)",  fg: "var(--score-low-fg)" },
+  empty: { bg: "var(--score-empty-bg)",fg: "var(--score-empty-fg)" }
+};
+ 
+let sortCol = null;
+let sortAsc = true;
+ 
+function loadData() {
+  return fetch(API_ENDPOINTS[state.view], { headers: { "Accept": "application/json" } })
+    .then(res => {
+      if (!res.ok) throw new Error(`Réponse HTTP ${res.status}`);
+      return res.json();
+    })
+    .then(records => {
+      const data = transformRecords(records);
+      if (state.view === "recent" && data.semaines.length > RECENT_WEEKS_COUNT) {
+        data.semaines = data.semaines.slice(-RECENT_WEEKS_COUNT);
+      }
+      return data;
+    });
+}
+ 
+function populateCompanyFilter(compagnies) {
+  const sel = document.getElementById("companyFilter");
+  const current = sel.value || "__ALL__";
+  sel.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "__ALL__";
+  optAll.textContent = "Toutes les compagnies";
+  sel.appendChild(optAll);
+  compagnies.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    sel.appendChild(opt);
+  });
+  sel.value = compagnies.includes(current) ? current : "__ALL__";
+}
+ 
+function render(data) {
+  populateCompanyFilter(data.compagnies);
+ 
+  let rows = data.chauffeurs.filter(c =>
+    state.compagnie === "__ALL__" || c.compagnie === state.compagnie
+  );
+ 
+  // Par défaut (aucun tri manuel choisi) : meilleur score de la semaine la
+  // plus récente en haut.
+  const effectiveCol = sortCol !== null ? sortCol : data.semaines[data.semaines.length - 1];
+  const effectiveAsc = sortCol !== null ? sortAsc : false;
+ 
+  rows = rows.slice().sort((a, b) => {
+    let va, vb;
+    if (effectiveCol === "nom") { va = a.nom; vb = b.nom; }
+    else { va = a.scores[effectiveCol] ? a.scores[effectiveCol].value : null; vb = b.scores[effectiveCol] ? b.scores[effectiveCol].value : null; }
+    if (va === null || va === undefined) va = -1;
+    if (vb === null || vb === undefined) vb = -1;
+    if (typeof va === "string") return effectiveAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return effectiveAsc ? va - vb : vb - va;
+  });
+ 
+  const wrap = document.getElementById("tableWrap");
+ 
+  if (rows.length === 0) {
+    wrap.innerHTML = `<div class="empty-state">Aucun chauffeur pour cette compagnie.</div>`;
+    document.getElementById("statusLine").textContent = "";
+    return;
+  }
+ 
+  const thNom = `<th data-col="nom" class="${effectiveCol === "nom" ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">Nom complet</th>`;
+  const thSemaines = data.semaines.map(s =>
+    `<th data-col="${s}" class="${effectiveCol === s ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">${data.semaineLabels[s]}</th>`
+  ).join("");
+ 
+  const bodyRows = rows.map(c => {
+    const nomCell = `<td class="nom">${c.nom}   ---  [${c.poste}]</td>`;
+    const scoreCells = data.semaines.map(s => {
+      const cell = c.scores[s];
+      const v = cell ? cell.value : null;
+      const cls = scoreClass(v);
+      const style = SCORE_STYLES[cls];
+      const display = (v === null || v === undefined)
+        ? "—"
+        : `${v}${cell && cell.shunt ? " (s)" : ""}`;
+      const tooltip = (cell && v !== null && v !== undefined)
+        ? Object.keys(BREAKDOWN_FIELDS)
+            .map(key => `${BREAKDOWN_LABELS[key]} : ${cell.breakdown[key] === null ? "—" : cell.breakdown[key]}`)
+            .join("\n")
+        : "";
+      return `<td class="score" style="background:${style.bg}; color:${style.fg}" title="${tooltip}">${display}</td>`;
+    }).join("");
+    return `<tr>${nomCell}${scoreCells}</tr>`;
+  }).join("");
+ 
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>${thNom}${thSemaines}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  `;
+ 
+  wrap.querySelectorAll("thead th").forEach(th => {
+    th.addEventListener("click", () => {
+      const col = th.dataset.col;
+      if (sortCol === col) sortAsc = !sortAsc;
+      else { sortCol = col; sortAsc = true; }
+      render(data);
+    });
+  });
+ 
+  document.getElementById("statusLine").textContent =
+    `${rows.length} chauffeur${rows.length > 1 ? "s" : ""} affiché${rows.length > 1 ? "s" : ""}`;
+}
+ 
+function bucketOf(v) {
+  if (v >= 90) return "b90";
+  if (v >= 80) return "b80";
+  if (v >= 70) return "b70";
+  return "low";
+}
+ 
+// Calcule, pour chaque semaine, le % de chauffeurs dans chaque palier —
+// en ignorant complètement ceux qui n'ont pas de score cette semaine-là.
+// Donc si 80 chauffeurs sur 100 ont un score et sont tous 90+, ça donne
+// 100% pour "90+" cette semaine, pas 80%.
+function computeBucketSeries(data, rows) {
+  const series = { low: [], b70: [], b80: [], b90: [] };
+ 
+  data.semaines.forEach(s => {
+    const withScore = rows
+      .map(c => c.scores[s] ? c.scores[s].value : null)
+      .filter(v => v !== null && v !== undefined);
+ 
+    const total = withScore.length;
+    const counts = { low: 0, b70: 0, b80: 0, b90: 0 };
+    withScore.forEach(v => counts[bucketOf(v)]++);
+ 
+    BUCKET_ORDER.forEach(key => {
+      series[key].push(total === 0 ? 0 : (counts[key] / total) * 100);
+    });
+  });
+ 
+  return series;
+}
+ 
+function renderChart(data, rows) {
+  const series = computeBucketSeries(data, rows);
+  const ctx = document.getElementById("scoreChart").getContext("2d");
+ 
+  const datasets = BUCKET_ORDER.map(key => ({
+    label: BUCKET_LABELS[key],
+    data: series[key],
+    backgroundColor: BUCKET_COLORS[key] + "cc",
+    borderColor: BUCKET_COLORS[key],
+    fill: true,
+    stack: "pct",
+    tension: 0.25,
+    pointRadius: 0
+  }));
+ 
+  if (chartInstance) chartInstance.destroy();
+ 
+  chartInstance = new Chart(ctx, {
+    type: "line",
+    data: { labels: data.semaines.map(s => data.semaineLabels[s]), datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        y: {
+          stacked: true,
+          min: 0,
+          max: 100,
+          ticks: { callback: v => v + "%" }
+        },
+        x: { stacked: true }
+      },
+      plugins: {
+        legend: { position: "bottom" },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label} : ${ctx.parsed.y.toFixed(1)}%`
+          }
+        }
+      }
+    }
+  });
+}
+ 
+function refresh() {
+  loadData().then(data => {
+    render(data);
+ 
+    // Le graphique a besoin des mêmes lignes filtrées (et triées, l'ordre
+    // n'a pas d'importance pour lui) que le tableau.
+    const rows = data.chauffeurs.filter(c =>
+      state.compagnie === "__ALL__" || c.compagnie === state.compagnie
+    );
+ 
+    document.getElementById("tableWrap").style.display = state.display === "table" ? "" : "none";
+    document.getElementById("chartWrap").style.display = state.display === "chart" ? "block" : "none";
+ 
+    if (state.display === "chart") renderChart(data, rows);
+  }).catch(err => {
+    document.getElementById("tableWrap").innerHTML =
+      `<div class="empty-state">Erreur de chargement des données.</div>`;
+    console.error(err);
+  });
+}
+ 
+document.getElementById("companyFilter").addEventListener("change", e => {
+  state.compagnie = e.target.value;
+  sortCol = null;
+  refresh();
+});
+ 
+document.querySelectorAll(".tabs .tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tabs .tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    state.view = tab.dataset.view;
+    sortCol = null;
+    refresh();
+  });
+});
+ 
+document.querySelectorAll(".display-tabs .tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".display-tabs .tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    state.display = tab.dataset.display;
+    refresh();
+  });
+});
+ 
+refresh();
+</script>
+ 
+</body>
+</html>

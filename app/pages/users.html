@@ -96,6 +96,10 @@
                     <input type="checkbox" id="newIsSuperUser" />
                     Super Utilisateur
                 </label>
+                <label style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="newIsReports" />
+                    Rapports
+                </label>
             </div>
             <button id="createUserBtn" type="button">Créer</button>
         </section>
@@ -112,6 +116,7 @@
                         <th class="col-150">Nom d'utilisateur</th>
                         <th class="col-80">Admin</th>
                         <th class="col-100">Super User</th>
+                        <th class="col-100">Reports</th>
                         <th class="col-100">Désactivé ?</th>
                         <th class="col-150">Actions</th>
                     </tr>
@@ -137,6 +142,10 @@
                 <label>
                     <input type="checkbox" id="userEditIsSuperUser" />
                     Super Utilisateur
+                </label>
+                <label>
+                    <input type="checkbox" id="userEditIsReports" />
+                    Rapporteur
                 </label>
                 <label>
                     <input type="checkbox" id="userEditIsDisabled" />
@@ -233,9 +242,10 @@
                     <td>${escapeHtml(u.AppUser)}</td>
                     <td>${u.IsAdmin ? 'Oui' : 'Non'}</td>
                     <td>${u.IsSuperUser ? 'Oui' : 'Non'}</td>
+                    <td>${u.IsReports ? 'Oui' : 'Non'}</td>
                     <td class="${isDisabled ? 'disabled-text' : ''}">${isDisabled ? 'Oui' : 'Non'}</td>
                     <td>
-                        <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}" data-isdisabled="${u.IsDisabled}">Éditer</button>
+                        <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}" data-isreports="${u.IsReports}" data-isdisabled="${u.IsDisabled}">Éditer</button>
                         <button class="btn-delete" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}">Désactivé</button>
                     </td>
                 `;
@@ -255,6 +265,7 @@
             const password = document.getElementById('newPassword').value.trim();
             const isAdmin = document.getElementById('newIsAdmin').checked;
             const isSuperUser = document.getElementById('newIsSuperUser').checked;
+            const isReports = document.getElementById('newIsReports').checked;
 
             if (!username || !password) {
                 alert('Nom d\'utilisateur et mot de passe sont obligatoires');
@@ -265,7 +276,7 @@
                 const res = await fetch('/api/admin/users/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-                    body: JSON.stringify({ username, password, isAdmin, isSuperUser })
+                    body: JSON.stringify({ username, password, isAdmin, isSuperUser, isReports })
                 });
 
                 if (!res.ok) {
@@ -278,6 +289,7 @@
                 document.getElementById('newPassword').value = '';
                 document.getElementById('newIsAdmin').checked = false;
                 document.getElementById('newIsSuperUser').checked = false;
+                document.getElementById('newIsReports').checked = false;
                 await loadAll();
                 render(state.data);
             } catch (err) {
@@ -318,9 +330,10 @@
                 const username = e.target.dataset.username;
                 const isAdmin = e.target.dataset.isadmin === 'true';
                 const isSuperUser = e.target.dataset.issuperuser === 'true';
+                const isReports = e.target.dataset.isreports === 'true';
                 const isDisabled = e.target.dataset.isdisabled === 'true';
                 
-                showEditUserModal(userId, username, isAdmin, isSuperUser, isDisabled);
+                showEditUserModal(userId, username, isAdmin, isSuperUser, isReports, isDisabled);
             }
         });
 
@@ -403,12 +416,13 @@
         const submitUserPwdBtn = document.getElementById('submitUserEditBtn');
         let currentUserIdToChange = null;
 
-        function showEditUserModal(userId, username, isAdmin, isSuperUser, isDisabled) {
+        function showEditUserModal(userId, username, isAdmin, isSuperUser, isReports, isDisabled) {
             currentUserIdToChange = userId;
             document.getElementById('userEditTarget').textContent = username;
             document.getElementById('userNewPassword').value = '';
             document.getElementById('userEditIsAdmin').checked = isAdmin;
             document.getElementById('userEditIsSuperUser').checked = isSuperUser;
+            document.getElementById('userEditIsReports').checked = isReports;
             document.getElementById('userEditIsDisabled').checked = isDisabled;
             userPwdModal.style.display = 'flex';
         }
@@ -427,13 +441,14 @@
             const newPassword = document.getElementById('userNewPassword').value.trim();
             const isAdmin = document.getElementById('userEditIsAdmin').checked;
             const isSuperUser = document.getElementById('userEditIsSuperUser').checked;
+            const isReports = document.getElementById('userEditIsReports').checked;
             const isDisabled = document.getElementById('userEditIsDisabled').checked;
 
             try {
                 const res = await fetch('/api/admin/users/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-                    body: JSON.stringify({ userId: parseInt(currentUserIdToChange), newPassword, isAdmin, isSuperUser, isDisabled })
+                    body: JSON.stringify({ userId: parseInt(currentUserIdToChange), newPassword, isAdmin, isSuperUser, isReports, isDisabled })
                 });
 
                 if (!res.ok) {

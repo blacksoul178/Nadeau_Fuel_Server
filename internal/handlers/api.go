@@ -30,6 +30,7 @@ type User struct {
 	Username    string
 	IsAdmin     bool
 	IsSuperUser bool
+	IsReports   bool
 }
 
 func normalizeUsername(u string) string {
@@ -43,16 +44,17 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	var (
 		id          int
 		hash        string
-		isAdmin     bool
-		isSuperUser bool
-		isDisabled  bool
+		isAdmin     sql.NullBool
+		isSuperUser sql.NullBool
+		isReports   sql.NullBool
+		isDisabled  sql.NullBool
 	)
 
 	err := db.QueryRowContext(ctx, `
-		SELECT id, password_hash, isAdmin, isSuperUser, isDisabled
+		SELECT id, password_hash, isAdmin, isSuperUser, isReports, isDisabled
 		FROM dbo.AppUser
 		WHERE AppUser=@u
-	`, sql.Named("u", u)).Scan(&id, &hash, &isAdmin, &isSuperUser, &isDisabled)
+	`, sql.Named("u", u)).Scan(&id, &hash, &isAdmin, &isSuperUser, &isReports, &isDisabled)
 
 	if err == sql.ErrNoRows {
 		// Ne divulgue pas si l'utilisateur existe ou non
@@ -68,15 +70,15 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 	}
 
 	// Check if user is disabled
-	if isDisabled {
+	if isDisabled.Valid && isDisabled.Bool {
 		return nil, errors.New("user account is disabled")
 	}
 	return &User{
-
 		ID:          id,
 		Username:    u,
-		IsAdmin:     isAdmin,
-		IsSuperUser: isSuperUser,
+		IsAdmin:     isAdmin.Valid && isAdmin.Bool,
+		IsSuperUser: isSuperUser.Valid && isSuperUser.Bool,
+		IsReports:   isReports.Valid && isReports.Bool,
 	}, nil
 }
 
@@ -210,7 +212,7 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, AppUser, IsAdmin, IsSuperUser, IsDisabled FROM dbo.AppUser ORDER BY AppUser`
+	query := `SELECT id, AppUser, IsAdmin, IsSuperUser, IsReports, IsDisabled FROM dbo.AppUser ORDER BY AppUser`
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
@@ -225,6 +227,7 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 		AppUser     string `json:"AppUser"`
 		IsAdmin     bool   `json:"IsAdmin"`
 		IsSuperUser bool   `json:"IsSuperUser"`
+		IsReports   bool   `json:"IsReports"`
 		IsDisabled  bool   `json:"IsDisabled"`
 	}
 
@@ -236,9 +239,10 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 			AppUser     sql.NullString
 			isAdmin     sql.NullBool
 			isSuperUser sql.NullBool
+			isReports   sql.NullBool
 			isDisabled  sql.NullBool
 		)
-		if err := rows.Scan(&id, &AppUser, &isAdmin, &isSuperUser, &isDisabled); err != nil {
+		if err := rows.Scan(&id, &AppUser, &isAdmin, &isSuperUser, &isReports, &isDisabled); err != nil {
 			logger.Info("Scan error on usersAllHandler: " + err.Error())
 			respondWithError(w, http.StatusInternalServerError, "Scan error")
 			return
@@ -249,6 +253,7 @@ func usersAllHandler(w http.ResponseWriter, r *http.Request) {
 			AppUser:     AppUser.String,
 			IsAdmin:     isAdmin.Bool,
 			IsSuperUser: isSuperUser.Bool,
+			IsReports:   isReports.Bool,
 			IsDisabled:  isDisabled.Bool,
 		})
 	}
@@ -2551,6 +2556,167 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
 }
+func bulletinMonthlyHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Select only the columns expected by the response struct
+	query := `
+	SELECT Nom, Semaine, ScoreMAJ, ScoreMAJ_Shunt, Poste, DispatchGroup, SécuritéTotal, AccélérationsTotal, DécélérationsTotal, ArrêtsTotal, ScoreTotal FROM dbo.v_bulletin_isaac_monthly
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on bulletinMonthlyHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Nom                string `json:"Nom"`
+		Semaine            string `json:"Semaine"`
+		ScoreMAJ           string `json:"ScoreMAJ"`
+		ScoreMAJ_Shunt     string `json:"ScoreMAJ_Shunt"`
+		Poste              string `json:"Poste"`
+		DispatchGroup      string `json:"DispatchGroup"` // Add DispatchGroup field
+		SécuritéTotal      string `json:"SécuritéTotal"`
+		AccélérationsTotal string `json:"AccélérationsTotal"`
+		DécélérationsTotal string `json:"DécélérationsTotal"`
+		ArrêtsTotal        string `json:"ArrêtsTotal"`
+		ScoreTotal         string `json:"ScoreTotal"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Nom                sql.NullString
+			Semaine            sql.NullString
+			ScoreMAJ           sql.NullString
+			ScoreMAJ_Shunt     sql.NullString
+			Poste              sql.NullString
+			DispatchGroup      sql.NullString // Add DispatchGroup variable
+			SécuritéTotal      sql.NullString
+			AccélérationsTotal sql.NullString
+			DécélérationsTotal sql.NullString
+			ArrêtsTotal        sql.NullString
+			ScoreTotal         sql.NullString
+		)
+		if err := rows.Scan(&Nom, &Semaine, &ScoreMAJ, &ScoreMAJ_Shunt, &Poste, &DispatchGroup, &SécuritéTotal, &AccélérationsTotal, &DécélérationsTotal, &ArrêtsTotal, &ScoreTotal); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on bulletinMonthlyHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Nom:                Nom.String,
+			Semaine:            Semaine.String,
+			ScoreMAJ:           ScoreMAJ.String,
+			ScoreMAJ_Shunt:     ScoreMAJ_Shunt.String,
+			Poste:              Poste.String,
+			DispatchGroup:      DispatchGroup.String,
+			SécuritéTotal:      SécuritéTotal.String,
+			AccélérationsTotal: AccélérationsTotal.String,
+			DécélérationsTotal: DécélérationsTotal.String,
+			ArrêtsTotal:        ArrêtsTotal.String,
+			ScoreTotal:         ScoreTotal.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on bulletinMonthlyHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+func bulletinAllHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	// Select only the columns expected by the response struct
+	query := `
+	SELECT Nom, Semaine, ScoreMAJ, ScoreMAJ_Shunt, Poste, DispatchGroup, SécuritéTotal, AccélérationsTotal, DécélérationsTotal, ArrêtsTotal, ScoreTotal FROM dbo.v_bulletin_isaac_All
+	`
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		http.Error(w, "query error: "+err.Error(), 500)
+		logger.Info("Query error on bulletinAllHandler: " + err.Error())
+		return
+	}
+	defer rows.Close()
+
+	type rowOut struct {
+		Nom                string `json:"Nom"`
+		Semaine            string `json:"Semaine"`
+		ScoreMAJ           string `json:"ScoreMAJ"`
+		ScoreMAJ_Shunt     string `json:"ScoreMAJ_Shunt"`
+		Poste              string `json:"Poste"`
+		DispatchGroup      string `json:"DispatchGroup"`
+		SécuritéTotal      string `json:"SécuritéTotal"`
+		AccélérationsTotal string `json:"AccélérationsTotal"`
+		DécélérationsTotal string `json:"DécélérationsTotal"`
+		ArrêtsTotal        string `json:"ArrêtsTotal"`
+		ScoreTotal         string `json:"ScoreTotal"`
+	}
+	out := make([]rowOut, 0, 256)
+
+	for rows.Next() {
+		var (
+			Nom                sql.NullString
+			Semaine            sql.NullString
+			ScoreMAJ           sql.NullString
+			ScoreMAJ_Shunt     sql.NullString
+			Poste              sql.NullString
+			DispatchGroup      sql.NullString
+			SécuritéTotal      sql.NullString
+			AccélérationsTotal sql.NullString
+			DécélérationsTotal sql.NullString
+			ArrêtsTotal        sql.NullString
+			ScoreTotal         sql.NullString
+		)
+		if err := rows.Scan(&Nom, &Semaine, &ScoreMAJ, &ScoreMAJ_Shunt, &Poste, &DispatchGroup, &SécuritéTotal, &AccélérationsTotal, &DécélérationsTotal, &ArrêtsTotal, &ScoreTotal); err != nil {
+			http.Error(w, "scan error: "+err.Error(), 500)
+			logger.Info("Scan error on bulletinAllHandler: " + err.Error())
+			return
+		}
+
+		out = append(out, rowOut{
+			Nom:                Nom.String,
+			Semaine:            Semaine.String,
+			ScoreMAJ:           ScoreMAJ.String,
+			ScoreMAJ_Shunt:     ScoreMAJ_Shunt.String,
+			SécuritéTotal:      SécuritéTotal.String,
+			AccélérationsTotal: AccélérationsTotal.String,
+			DécélérationsTotal: DécélérationsTotal.String,
+			ArrêtsTotal:        ArrêtsTotal.String,
+			ScoreTotal:         ScoreTotal.String,
+			Poste:              Poste.String,
+			DispatchGroup:      DispatchGroup.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "rows error: "+err.Error(), 500)
+		logger.Info("Rows error on bulletinAllHandler: " + err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
 func peagesAllHandler(w http.ResponseWriter, r *http.Request) { // TO DO ONCE VIEW IS DONE
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -3614,6 +3780,7 @@ func usersCreateHandler(w http.ResponseWriter, r *http.Request) {
 		Password    string `json:"password"`
 		IsAdmin     bool   `json:"isAdmin"`
 		IsSuperUser bool   `json:"isSuperUser"`
+		IsReports   bool   `json:"isReports"`
 	}
 
 	var body reqBody
@@ -3641,13 +3808,14 @@ func usersCreateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	insertQ := `INSERT INTO dbo.AppUser (AppUser, password_hash, IsAdmin, IsSuperUser) VALUES (@username, @hash, @isAdmin, @isSuperUser)`
+	insertQ := `INSERT INTO dbo.AppUser (AppUser, password_hash, IsAdmin, IsSuperUser, IsReports) VALUES (@username, @hash, @isAdmin, @isSuperUser, @isReports)`
 
 	if _, err := db.ExecContext(ctx, insertQ,
 		sql.Named("username", username),
 		sql.Named("hash", string(hash)),
 		sql.Named("isAdmin", body.IsAdmin),
 		sql.Named("isSuperUser", body.IsSuperUser),
+		sql.Named("isReports", body.IsReports),
 	); err != nil {
 		logger.Info("Insert error on usersCreateHandler: " + err.Error())
 		respondWithError(w, http.StatusInternalServerError, "Database error")
@@ -3868,6 +4036,7 @@ func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		NewPassword string `json:"newPassword"`
 		IsAdmin     bool   `json:"isAdmin"`
 		IsSuperUser bool   `json:"isSuperUser"`
+		IsReports   bool   `json:"isReports"`
 		IsDisabled  bool   `json:"isDisabled"`
 	}
 
@@ -3928,19 +4097,21 @@ func usersUpdateHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		updateQ = `UPDATE dbo.AppUser SET password_hash = @hash, IsAdmin = @isAdmin, IsSuperUser = @isSuperUser, IsDisabled = @isDisabled WHERE id = @id`
+		updateQ = `UPDATE dbo.AppUser SET password_hash = @hash, IsAdmin = @isAdmin, IsSuperUser = @isSuperUser, IsReports = @isReports, IsDisabled = @isDisabled WHERE id = @id`
 		args = append(args,
 			sql.Named("hash", string(newHash)),
 			sql.Named("isAdmin", body.IsAdmin),
 			sql.Named("isSuperUser", body.IsSuperUser),
+			sql.Named("isReports", body.IsReports),
 			sql.Named("id", body.UserID),
 			sql.Named("isDisabled", body.IsDisabled),
 		)
 	} else {
-		updateQ = `UPDATE dbo.AppUser SET IsAdmin = @isAdmin, IsSuperUser = @isSuperUser, IsDisabled = @isDisabled WHERE id = @id`
+		updateQ = `UPDATE dbo.AppUser SET IsAdmin = @isAdmin, IsSuperUser = @isSuperUser, IsReports = @isReports, IsDisabled = @isDisabled WHERE id = @id`
 		args = append(args,
 			sql.Named("isAdmin", body.IsAdmin),
 			sql.Named("isSuperUser", body.IsSuperUser),
+			sql.Named("isReports", body.IsReports),
 			sql.Named("id", body.UserID),
 			sql.Named("isDisabled", body.IsDisabled),
 		)

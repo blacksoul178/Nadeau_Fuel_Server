@@ -5,12 +5,16 @@ package handlers
 import (
 	"Nadeau_Fuel_Server/internal/logger"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
 )
+
+//go:embed chart.umd.min.js
+var chartFS embed.FS
 
 const filepathRoot = "app"
 
@@ -42,6 +46,7 @@ var tplVehicules = parsePageTemplate("vehicules.html")
 var tplTaux = parsePageTemplate("taux.html")
 var tplPeages = parsePageTemplate("peages.html")
 var tplCamionsBroker = parsePageTemplate("camionsBroker.html")
+var tplbulletin = parsePageTemplate("bulletin.html")
 
 // super user
 var tplTransactions = parsePageTemplate("transactions.html")
@@ -60,6 +65,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	//static files
 	assets := http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(filepathRoot, "assets"))))
 	mux.Handle("/assets/", assets)
+	mux.Handle("/chart.umd.min.js", http.FileServer(http.FS(chartFS)))
 
 	//all user pages routes
 	mux.HandleFunc("GET /health", Health)
@@ -71,6 +77,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.HandleFunc("/brokers", requireLogin(brokersHandler))
 	mux.HandleFunc("/vehicules", requireLogin(vehiculesHandler))
 	mux.HandleFunc("/taux", requireLogin(tauxHandler))
+	mux.HandleFunc("/bulletin", requireLogin(bulletinHandler))
 	//Super User pages routes
 	mux.HandleFunc("/transactions", requireLogin(transactionsHandler))
 	mux.HandleFunc("/petrolieres", requireLogin(petrolieresHandler))
@@ -97,6 +104,8 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	mux.Handle("GET /api/brokers/allBrokers", requireLogin(http.HandlerFunc(brokersAllHandler)))
 	mux.Handle("GET /api/vehicules/allVehicules", requireLogin(http.HandlerFunc(vehiculesAllHandler)))
 	mux.Handle("GET /api/taux/allWeek", requireLogin(http.HandlerFunc(tauxAllWeekHandler)))
+	mux.Handle("GET /api/bulletin/monthly", requireLogin(http.HandlerFunc(bulletinMonthlyHandler)))
+	mux.Handle("GET /api/bulletin/all", requireLogin(http.HandlerFunc(bulletinAllHandler)))
 
 	//Get API Super Users
 	mux.Handle("GET /api/transactions/allTransactions", requireLogin(http.HandlerFunc(transactionsAllHandler)))

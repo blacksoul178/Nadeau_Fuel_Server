@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"os/exec"
+	"strings"
 )
 
 // SessionInfo holds the parsed session cookie data
@@ -16,11 +17,13 @@ type SessionInfo struct {
 	IsSuperUser bool
 }
 type PageData struct {
-	Username  string
-	Role      string
-	IsAdmin   bool
-	CSRFToken string
-	ActiveTab string
+	Username    string
+	Role        string
+	IsAdmin     bool
+	IsSuperUser bool
+	IsReports   bool
+	CSRFToken   string
+	ActiveTab   string
 }
 
 var sessionManager *session.Manager
@@ -68,6 +71,31 @@ func IsSuperUser(r *http.Request) bool {
 	session := GetSessionInfo(r)
 	return session != nil && session.Role == "superuser"
 }
+func IsReports(r *http.Request) bool {
+	session := GetSessionInfo(r)
+	return session != nil && session.Role == "reports"
+}
+
+func makePageData(session *SessionInfo, csrfToken string) map[string]interface{} {
+	return map[string]interface{}{
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"IsReports":   session.Role == "reports",
+		"CSRFToken":   csrfToken,
+	}
+}
+
+func isReportsAllowedPath(path string) bool {
+	switch path {
+	case "/home", "/logout", "/bulletin", "/api/bulletin/monthly", "/api/bulletin/all":
+		return true
+	default:
+		return false
+	}
+}
+
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// If already authenticated → home
 	if GetSessionInfo(r) != nil && r.Method == "GET" {
@@ -132,6 +160,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			role = "superuser"
 		} else if user.IsAdmin {
 			role = "admin"
+		} else if user.IsReports {
+			role = "reports"
 		}
 
 		sessionCookie, err := sessionManager.CreateSession(user.Username, role)
@@ -227,6 +257,15 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 		if session == nil {
 			logger.Info("Authentication required but session invalid")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if session.Role == "reports" && !isReportsAllowedPath(r.URL.Path) {
+			logger.Info("Reports user denied access to " + r.URL.Path)
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				respondWithError(w, http.StatusForbidden, "Unauthorized")
+				return
+			}
+			http.Redirect(w, r, "/bulletin", http.StatusSeeOther)
 			return
 		}
 		next(w, r)
@@ -722,6 +761,34 @@ func camionsBrokerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = tplCamionsBroker.Execute(w, data)
+}
+func bulletinHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Generate fresh CSRF token for any forms on the page
+	token, err := csrfManager.GenerateToken()
+	if err != nil {
+		logger.Info("Failed to generate CSRF token: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	csrfManager.SetTokenCookie(w, token)
+
+	data := map[string]interface{}{
+		"Username":    session.Username,
+		"Role":        session.Role,
+		"IsAdmin":     session.Role == "admin",
+		"IsSuperUser": session.Role == "superuser",
+		"IsReports":   session.Role == "reports",
+		"CSRFToken":   token,
+	}
+
+	_ = tplbulletin.Execute(w, data)
 }
 
 // Local Scripts
