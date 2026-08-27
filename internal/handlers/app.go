@@ -143,6 +143,7 @@ func App(mux *http.ServeMux, database *sql.DB) {
 	// local scripts
 	mux.Handle("POST /api/drivers/sync", requireLogin(http.HandlerFunc(syncDriversHandler)))
 	mux.Handle("POST /api/transactions/import", requireLogin(http.HandlerFunc(importTransactionsHandler)))
+	mux.Handle("POST /api/bulletin/import", requireLogin(http.HandlerFunc(importBulletinHandler)))
 
 	//admin APIs
 	mux.Handle("GET /api/admin/syncrunsError", requireLogin(http.HandlerFunc(syncrunsAllHandler)))

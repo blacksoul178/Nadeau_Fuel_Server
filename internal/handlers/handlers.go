@@ -814,3 +814,14 @@ func importTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write([]byte("Importation successful:\n" + string(output)))
 }
+func importBulletinHandler(w http.ResponseWriter, r *http.Request) {
+	session := GetSessionInfo(r)
+	logger.Info("Bulletin importation initiated by: " + session.Username)
+	cmd := exec.Command("python", "C:\\TI_Projet_Fuel\\jobs\\Bulletin_Isaac\\import_bulletin_isaac.py")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, "Importation failed: "+err.Error()+"\n"+string(output), http.StatusInternalServerError)
+		return
+	}
+	w.Write([]byte("Importation successful:\n" + string(output)))
+}

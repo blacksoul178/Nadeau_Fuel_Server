@@ -6,158 +6,56 @@
     <title>Fuel'O'Matic - bulletin</title>
     <link rel="stylesheet" href="/assets/style.css">
 <style>
-  :root {
-    color-scheme: dark;
-
-    /* Main colors from your second stylesheet */
-    --paper: #181b22;
-    --card: #464444;
-
-    /* Text */
-    --ink: #ffffff;
-    --ink-soft: #d1d5db;
-
-    /* Borders */
-    --line: #04070c;
-
-    /* Accent */
-    --accent: #0d8bff;
-    --accent-soft: #0b1f33;
-
-    /* Score colors */
+  .bulletin-page {
     --score-90-bg: #3c9f5d;
     --score-90-fg: #ffffff;
-
     --score-80-bg: #d7ecc7;
     --score-80-fg: #35502a;
-
     --score-70-bg: #f3b9a6;
     --score-70-fg: #6b2d1c;
-
     --score-low-bg: #e5484d;
     --score-low-fg: #ffffff;
-
     --score-empty-bg: #666666;
     --score-empty-fg: #ffffff;
-}
-
-  * { box-sizing: border-box; }
-
-  body {
-    margin: 0;
-    padding: 10px;
-    min-height: 100vh;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    font-size: 16px;
-  }
-  header {
-    background: var(--card);
-    padding: 10px 20px;
-    border-radius: 12px;
-    margin-bottom: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
-}
-
-
-  header .title-block {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
   }
 
-  header h1 {
-    font-size: 17px;
-    font-weight: 600;
-    margin: 0;
-    letter-spacing: 0.2px;
-  }
-
-  header .route-strip {
+  .bulletin-page .bulletin-heading { justify-content: flex-start; gap: 18px; }
+  .bulletin-page .title-block { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bulletin-page .title-block h2 { margin: 0; }
+  .bulletin-page .route-strip {
     width: 46px;
     height: 6px;
     border-radius: 3px;
-    background: linear-gradient(90deg,
-      var(--score-low-bg) 0%,
-      var(--score-70-bg) 33%,
-      var(--score-80-bg) 66%,
-      var(--score-90-bg) 100%);
+    background: linear-gradient(90deg, #e5484d 0%, #e8886a 33%, #a8d488 66%, #3c9f5d 100%);
   }
-
-  .controls {
+  .bulletin-page .importBulletins-btn { margin-left: 8px; }
+  .bulletin-page .controls {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 28px;
-    background: var(--card);
-    border-bottom: 1px solid var(--line);
+    gap: 10px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
   }
-
-  .controls label {
-    font-size: 13px;
-    color: var(--ink-soft);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  select {
-    padding: 7px 10px;
-    border: 1px solid #45484d;
-    border-radius: 6px;
-    background: #333;
-    color: #ffffff;
-    font-size: 14px;
-    font-family: inherit;
-}
-
-select:focus {
-    outline: none;
-    background: #404040;
-}
-
-  .tabs {
+  .bulletin-page .controls > label { margin: 0; }
+  .bulletin-page .controls select { width: auto; min-width: 190px; }
+  .bulletin-page .controls > div {
     display: flex;
-    gap: 4px;
-    margin-left: auto;
+    flex-direction: row;
+    flex: initial;
+    min-width: 0;
   }
-
-  .tab {
-    font-size: 14px;
-    padding: 8px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    background: #ffffff;
-    color: #111827;
-    font-weight: 600;
-}
-
-.tab:hover {
-    background: #f3f4f6;
-}
-
-.tab.active {
-    background: #0b1f33;
-    color: #ffffff;
-    border-color: #0b1f33;
-}
-
-  main {
-    padding: 20px 28px 40px;
-  }
-
-  .legend {
+  .bulletin-page .controls .tabs,
+  .bulletin-page .display-tabs { margin: 0 0 0 auto; }
+  .bulletin-page .display-tabs { display: flex; gap: 8px; }
+  .bulletin-page .legend {
     display: flex;
     gap: 16px;
     align-items: center;
     margin-bottom: 14px;
-    font-size: 14px;
-    color: var(--ink-soft);
+    color: #d1d5db;
+    flex-wrap: wrap;
   }
-
-  .legend span.chip {
+  .bulletin-page .legend .chip {
     display: inline-block;
     width: 10px;
     height: 10px;
@@ -165,92 +63,57 @@ select:focus {
     margin-right: 5px;
     vertical-align: middle;
   }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--card);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 2px rgba(20, 24, 33, 0.06);
-  }
-
-  thead th {
-    font-size: 14px;
-    background: #464444;
-    color: #ffffff;
-    border-bottom: 1px solid #04070c;
-}
-  tbody tr:nth-child(odd) {
-    background: #2a2a2a;
-}
-
-tbody tr:nth-child(even) {
-    background: #3a3a3a;
-}
-
-tbody tr:hover {
-    background: #4a6fa5;
-}
-
-  thead th.sorted::after {
-    content: " ▾";
-    color: var(--accent);
-  }
-
-  thead th.sorted.asc::after {
-    content: " ▴";
-  }
-
-  tbody td {
-    font-size: 15px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--line);
-    font-variant-numeric: tabular-nums;
-  }
-
-  tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  td.nom {
-    font-weight: 600;
-    color: var(--ink);
-    white-space: nowrap;
-  }
-
-  td.score {
+  .bulletin-page #tableWrap table { width: 100%; border-collapse: collapse; }
+  .bulletin-page #tableWrap th,
+  .bulletin-page #tableWrap td { border: 1px solid #04070c; padding: 10px; }
+  .bulletin-page #tableWrap th { background: #464444; cursor: pointer; }
+  .bulletin-page #tableWrap tbody tr:nth-child(odd) { background: #2a2a2a; }
+  .bulletin-page #tableWrap tbody tr:nth-child(even) { background: #3a3a3a; }
+  .bulletin-page #tableWrap tbody tr:hover { background: #4a6fa5; }
+  .bulletin-page #tableWrap th.sorted::after { content: " ▾"; color: #0d8bff; }
+  .bulletin-page #tableWrap th.sorted.asc::after { content: " ▴"; }
+  .bulletin-page td.nom { font-weight: 600; white-space: nowrap; }
+  .bulletin-page td.score {
     text-align: center;
     font-weight: 700;
-    font-family: "IBM Plex Mono", ui-monospace, monospace;
-    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
   }
-
-  .status-line {
-    font-size: 14px;
-    color: var(--ink-soft);
-    margin-top: 12px;
-  }
-
-  .empty-state {
+  .bulletin-page .status-line,
+  .bulletin-page .chart-note { margin-top: 12px; color: #d1d5db; font-size: 14px; }
+  .bulletin-page .empty-state {
     padding: 40px;
     text-align: center;
-    color: var(--ink-soft);
-    background: var(--card);
+    color: #d1d5db;
+    background: #464444;
+    border: 1px solid #04070c;
     border-radius: 8px;
+  }
+  .bulletin-page #chartWrap {
+    padding: 16px;
+    background: #464444;
+    border: 1px solid #04070c;
+    border-radius: 8px;
+  }
+  @media (max-width: 768px) {
+    .bulletin-page .controls .tabs,
+    .bulletin-page .display-tabs { margin-left: 0; }
+    .bulletin-page #tableWrap { overflow-x: auto; }
   }
 </style>
 </head>
-<body>
+<body class="bulletin-page">
  {{template "header" .}}
-<header>
+<header class="bulletin-heading">
   <div class="title-block">
     <div class="route-strip"></div>
-    <h1>Pointage — Chauffeurs</h1>
+    <h2>Pointage — Chauffeurs</h2>
+    <span><label for="f-name">Importation de bulletins</label>
+      <button type="button" id="importBulletins" class="importBulletins-btn">Importer les bulletins</button></span>
+    
   </div>
 </header>
- 
-<div class="controls">
+<div class="controls panel">
   <label for="companyFilter">Compagnie</label>
   <select id="companyFilter"></select>
  
@@ -265,7 +128,8 @@ tbody tr:hover {
   </div>
 </div>
  
-<main>
+ 
+<main class="container">
   <div class="legend">
     <span><span class="chip" style="background:var(--score-90-bg)"></span>90 +</span>
     <span><span class="chip" style="background:var(--score-80-bg)"></span>80 – 89,99</span>
@@ -291,6 +155,10 @@ tbody tr:hover {
 <script src="/chart.umd.min.js"></script>
 <script>
 
+
+
+
+
     // fetch coach reports data
     async function get_monthly_bulletin() {
       try {
@@ -307,6 +175,43 @@ tbody tr:hover {
       } catch (e) { /* ignore */ }
     }
 
+
+
+
+function getCookie(name) {
+  const prefix = `${name}=`;
+  const cookie = document.cookie.split('; ').find(row => row.startsWith(prefix));
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : '';
+}
+
+function setCookie(name, value) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+async function importBulletin() {
+
+      try {
+        const csrf = getCookie('csrf_token');
+        const res = await fetch('/api/bulletin/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': csrf
+          }
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ('HTTP ' + res.status));
+        }
+
+        alert('Importation des bulletins enclanché, attendre une minute et rafraichir la page ✅');
+      }
+     catch (e) {
+        alert('Erreur du démarrage de l\'importation: ' + (e));
+      }
+    }
 
 /* ==========================================================================
    CONTRAT JSON ATTENDU DU SERVEUR GO
@@ -425,9 +330,9 @@ function transformRecords(records) {
 }
  
 let state = {
-  view: "recent",
-  compagnie: "__ALL__",
-  display: "table"
+  view: getCookie("bulletin_view") === "history" ? "history" : "recent",
+  compagnie: getCookie("bulletin_compagnie") || "__ALL__",
+  display: getCookie("bulletin_display") === "chart" ? "chart" : "table"
 };
  
 // Couleurs des 4 paliers, dans l'ordre d'empilement du graphique (du bas vers le haut).
@@ -483,7 +388,7 @@ function loadData() {
  
 function populateCompanyFilter(compagnies) {
   const sel = document.getElementById("companyFilter");
-  const current = sel.value || "__ALL__";
+  const current = state.compagnie || sel.value || "__ALL__";
   sel.innerHTML = "";
   const optAll = document.createElement("option");
   optAll.value = "__ALL__";
@@ -495,7 +400,8 @@ function populateCompanyFilter(compagnies) {
     opt.textContent = c;
     sel.appendChild(opt);
   });
-  sel.value = compagnies.includes(current) ? current : "__ALL__";
+  sel.value = current === "__ALL__" || compagnies.includes(current) ? current : "__ALL__";
+  state.compagnie = sel.value;
 }
  
 function render(data) {
@@ -671,15 +577,17 @@ function refresh() {
  
 document.getElementById("companyFilter").addEventListener("change", e => {
   state.compagnie = e.target.value;
+  setCookie("bulletin_compagnie", state.compagnie);
   sortCol = null;
   refresh();
 });
  
-document.querySelectorAll(".tabs .tab").forEach(tab => {
+document.querySelectorAll(".controls .tabs .tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tabs .tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".controls .tabs .tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
     state.view = tab.dataset.view;
+    setCookie("bulletin_view", state.view);
     sortCol = null;
     refresh();
   });
@@ -690,9 +598,17 @@ document.querySelectorAll(".display-tabs .tab").forEach(tab => {
     document.querySelectorAll(".display-tabs .tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
     state.display = tab.dataset.display;
+    setCookie("bulletin_display", state.display);
     refresh();
   });
 });
+
+
+document.querySelectorAll(".controls .tabs .tab, .display-tabs .tab").forEach(tab => tab.classList.remove("active"));
+document.querySelector(`.controls [data-view="${state.view}"]`).classList.add("active");
+document.querySelector(`.display-tabs [data-display="${state.display}"]`).classList.add("active");
+document.getElementById("importBulletins").addEventListener("click", importBulletin);
+
  
 refresh();
 </script>

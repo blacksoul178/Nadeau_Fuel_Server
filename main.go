@@ -56,7 +56,7 @@ func main() {
 	if TEST == true {
 		log.Fatal(srv.ListenAndServeTLS("./certs/dev/dev.crt", "./certs/dev/dev.key"))
 	} else {
-		log.Fatal(srv.ListenAndServeTLS("./certs/prod/etiquette2k19.crt", "./certs/prod/etiquette2k19.key"))
+		log.Fatal(srv.ListenAndServeTLS("./certs/prod/fuelomatic.crt", "./certs/prod/fuelomatic.key"))
 	}
 
 }
