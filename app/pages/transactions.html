@@ -168,8 +168,10 @@ tr.rating-3 {
       const status = String(r.Status ?? '').trim().toUpperCase();
       const hasFailures = Boolean(String(r.Missing ?? '').trim()) || Boolean(String(r.OtherFailures ?? '').trim());
       const errorMessage = String(r.ErrorMessage ?? '').trim();
+      const transactionName = String(r.RunName ?? '').trim().toLowerCase()
+      const otherFails = String(r.OtherFailures ?? '').trim().toLowerCase()
 
-      if (status === 'SUCCESS' || (status === 'PARTIAL'&& !hasFailures)) return 'rating-1';
+      if (status === 'SUCCESS' || (status === 'PARTIAL' && !hasFailures) || (transactionName.includes("harnois_petits_véhicules") && otherFails.includes("transactions sans numéros de cartes"))) return 'rating-1';
       if (hasFailures) return 'rating-3';
       if (errorMessage === 'Fichier vide')  return 'rating-2';
       if (errorMessage === "Incapable de lire Compte")  return 'rating-3';

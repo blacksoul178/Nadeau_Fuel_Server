@@ -360,6 +360,7 @@
                   const ddValDate = toDateInput(ddVal) || '';
                   if (FKDGCell) {
                     FKDGCell.parentElement.innerHTML = `<select class="inp-FKDG"
+                    >
                     <option value="1" ${FKDGVal === 'TGN' ? 'selected' : ''}>TGN</option>
                     <option value="2" ${FKDGVal === 'TMC' ? 'selected' : ''}>TMC</option>
                     <option value="4" ${FKDGVal === 'MTA' ? 'selected' : ''}>MTA</option>
