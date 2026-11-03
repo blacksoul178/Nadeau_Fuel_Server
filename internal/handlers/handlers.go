@@ -793,6 +793,10 @@ func bulletinHandler(w http.ResponseWriter, r *http.Request) {
 
 // Local Scripts
 func syncDriversHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
 	session := GetSessionInfo(r)
 	logger.Info("Isaac sync run initiated by: " + session.Username)
 	cmd := exec.Command("python", "C:\\TI_Projet_Fuel\\jobs\\Sync_Isaac.py")
@@ -804,6 +808,10 @@ func syncDriversHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Sync successful:\n" + string(output)))
 }
 func importTransactionsHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
 	session := GetSessionInfo(r)
 	logger.Info("Transaction importation initiated by: " + session.Username)
 	cmd := exec.Command("python", "C:\\TI_Projet_Fuel\\jobs\\Transactions\\import_transactions.py")
@@ -815,6 +823,10 @@ func importTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Importation successful:\n" + string(output)))
 }
 func importBulletinHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
 	session := GetSessionInfo(r)
 	logger.Info("Bulletin importation initiated by: " + session.Username)
 	cmd := exec.Command("python", "C:\\TI_Projet_Fuel\\jobs\\Bulletin_Isaac\\import_bulletin_isaac.py")

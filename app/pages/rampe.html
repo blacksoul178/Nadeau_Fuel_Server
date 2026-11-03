@@ -34,6 +34,8 @@
   <script>
     const state = { data: [] };
 
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     async function loadAll() {
       const res = await fetch('/api/rampe/allRampe', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
@@ -47,10 +49,10 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.Date ?? ''}</td>
-          <td>${r.ULSDQC1 ?? ''}</td>
-          <td>${r.GrosReservoir ?? ''}</td>
-          <td>${r.PetitReservoir ?? ''}</td>
+          <td>${escapeHtml(r.Date)}</td>
+          <td>${escapeHtml(r.ULSDQC1)}</td>
+          <td>${escapeHtml(r.GrosReservoir)}</td>
+          <td>${escapeHtml(r.PetitReservoir)}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {

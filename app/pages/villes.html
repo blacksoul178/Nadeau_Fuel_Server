@@ -45,6 +45,8 @@
 
 const state = { data: [], debounceTimer: null };
 
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 // ---------------- CSRF ----------------
 function getCSRF() {
   const m = document.querySelector('meta[name="csrf-token"]');
@@ -122,12 +124,12 @@ function render(rows) {
   rows.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${r.SupplierCity}</td>
+      <td>${escapeHtml(r.SupplierCity)}</td>
 
-      <td class="cell-NormalizedCity"><span class="val">${r.NormalizedCity}</span></td>
-      <td class="cell-Region"><span class="val">${r.Region}</span></td>
-      <td class="cell-LastUpdatedBy"><span class="val">${r.LastUpdatedBy}</span></td>
-      <td class="cell-LastUpdatedDate"><span class="val">${r.LastUpdatedDate.slice(0,10)}</span></td>
+      <td class="cell-NormalizedCity"><span class="val">${escapeHtml(r.NormalizedCity)}</span></td>
+      <td class="cell-Region"><span class="val">${escapeHtml(r.Region)}</span></td>
+      <td class="cell-LastUpdatedBy"><span class="val">${escapeHtml(r.LastUpdatedBy)}</span></td>
+      <td class="cell-LastUpdatedDate"><span class="val">${escapeHtml(r.LastUpdatedDate.slice(0,10))}</span></td>
 
 
       <td>
@@ -169,7 +171,7 @@ function setupEditing() {
       const rVal = regionCell.querySelector('.val').textContent.trim();
 
       normCell.innerHTML =
-        `<input class="inp-NormalizedCity" value="${nVal}">`;
+        `<input class="inp-NormalizedCity" value="${escapeHtml(nVal)}">`;
       const regions = [
         'bas-saint-laurent',
         'saguenay-lac-saint-jean',
@@ -233,8 +235,8 @@ function setupEditing() {
       }
 
       // ✅ optimistic UI update
-      normCell.innerHTML = `<span class="val">${NormalizedCity ?? ''}</span>`;
-      regionCell.innerHTML = `<span class="val">${Region ?? ''}</span>`;
+      normCell.innerHTML = `<span class="val">${escapeHtml(NormalizedCity)}</span>`;
+      regionCell.innerHTML = `<span class="val">${escapeHtml(Region)}</span>`;
 
       if (updatedByVal) {
         updatedByVal.textContent = currentUser;

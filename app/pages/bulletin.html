@@ -73,6 +73,7 @@
   .bulletin-page #tableWrap th.sorted::after { content: " ▾"; color: #0d8bff; }
   .bulletin-page #tableWrap th.sorted.asc::after { content: " ▴"; }
   .bulletin-page td.nom { font-weight: 600; white-space: nowrap; }
+  .bulletin-page td.assignation { white-space: nowrap; }
   .bulletin-page td.score {
     text-align: center;
     font-weight: 700;
@@ -116,7 +117,10 @@
 <div class="controls panel">
   <label for="companyFilter">Compagnie</label>
   <select id="companyFilter"></select>
- 
+  <label for="assignationFilter">Assignation</label>
+  <select id="assignationFilter"></select>
+  <button type="button" id="exportExcel">Exporter en Excel</button>
+
   <div class="tabs">
     <button class="tab active" data-view="recent">4 dernières semaines</button>
     <button class="tab" data-view="history">Historique complet</button>
@@ -153,6 +157,7 @@
 </main>
  
 <script src="/chart.umd.min.js"></script>
+<script src="/assets/exceljs.min.js"></script>
 <script>
 
 
@@ -177,6 +182,8 @@
 
 
 
+
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function getCookie(name) {
   const prefix = `${name}=`;
@@ -297,6 +304,7 @@ function transformRecords(records) {
         nom: r.Nom,
         compagnie,
         poste: r.Poste || "",
+        assignation: r.Assignation,
         scores: {}
       });
     }
@@ -332,7 +340,8 @@ function transformRecords(records) {
 let state = {
   view: getCookie("bulletin_view") === "history" ? "history" : "recent",
   compagnie: getCookie("bulletin_compagnie") || "__ALL__",
-  display: getCookie("bulletin_display") === "chart" ? "chart" : "table"
+  assignation: getCookie("bulletin_assignation") || "__ALL__",
+display: getCookie("bulletin_display") === "chart" ? "chart" : "table"
 };
  
 // Couleurs des 4 paliers, dans l'ordre d'empilement du graphique (du bas vers le haut).
@@ -361,11 +370,11 @@ function scoreClass(v) {
 }
  
 const SCORE_STYLES = {
-  b90:   { bg: "var(--score-90-bg)",   fg: "var(--score-90-fg)" },
-  b80:   { bg: "var(--score-80-bg)",   fg: "var(--score-80-fg)" },
-  b70:   { bg: "var(--score-70-bg)",   fg: "var(--score-70-fg)" },
-  low:   { bg: "var(--score-low-bg)",  fg: "var(--score-low-fg)" },
-  empty: { bg: "var(--score-empty-bg)",fg: "var(--score-empty-fg)" }
+  b90:   { bgVar: "--score-90-bg", fgVar: "--score-90-fg", bg: "var(--score-90-bg)",   fg: "var(--score-90-fg)" },
+  b80:   { bgVar: "--score-80-bg", fgVar: "--score-80-fg", bg: "var(--score-80-bg)",   fg: "var(--score-80-fg)" },
+  b70:   { bgVar: "--score-70-bg", fgVar: "--score-70-fg", bg: "var(--score-70-bg)",   fg: "var(--score-70-fg)" },
+  low:   { bgVar: "--score-low-bg", fgVar: "--score-low-fg", bg: "var(--score-low-bg)",  fg: "var(--score-low-fg)" },
+  empty: { bgVar: "--score-empty-bg", fgVar: "--score-empty-fg", bg: "var(--score-empty-bg)",fg: "var(--score-empty-fg)" }
 };
  
 let sortCol = null;
@@ -404,13 +413,53 @@ function populateCompanyFilter(compagnies) {
   state.compagnie = sel.value;
 }
  
-function render(data) {
-  populateCompanyFilter(data.compagnies);
- 
-  let rows = data.chauffeurs.filter(c =>
+const NO_ASSIGNATION = "Sans assignation";
+function assignationOf(c) {
+  return (c.assignation === null || c.assignation === undefined || String(c.assignation).trim() === "")
+    ? NO_ASSIGNATION
+    : String(c.assignation).trim();
+}
+
+// Chauffeurs de la compagnie choisie (sert à construire la liste des assignations).
+function rowsForCompany(data) {
+  return data.chauffeurs.filter(c =>
     state.compagnie === "__ALL__" || c.compagnie === state.compagnie
   );
- 
+}
+
+// Chauffeurs visibles : compagnie ET assignation choisies.
+function filterRows(data) {
+  return rowsForCompany(data).filter(c =>
+    state.assignation === "__ALL__" || assignationOf(c) === state.assignation
+  );
+}
+
+function populateAssignationFilter(data) {
+  const sel = document.getElementById("assignationFilter");
+  const list = Array.from(new Set(rowsForCompany(data).map(assignationOf))).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "__ALL__";
+  optAll.textContent = "Toutes les assignations";
+  sel.appendChild(optAll);
+  list.forEach(a => {
+    const opt = document.createElement("option");
+    opt.value = a;
+    opt.textContent = a;
+    sel.appendChild(opt);
+  });
+  sel.value = list.includes(state.assignation) ? state.assignation : "__ALL__";
+  state.assignation = sel.value;
+}
+
+let lastRender = null; // { data, rows } tels qu'affichés dans le tableau, pour l'export Excel
+
+function render(data) {
+  populateCompanyFilter(data.compagnies);
+  populateAssignationFilter(data);
+
+  let rows = filterRows(data);
+
   // Par défaut (aucun tri manuel choisi) : meilleur score de la semaine la
   // plus récente en haut.
   const effectiveCol = sortCol !== null ? sortCol : data.semaines[data.semaines.length - 1];
@@ -419,6 +468,7 @@ function render(data) {
   rows = rows.slice().sort((a, b) => {
     let va, vb;
     if (effectiveCol === "nom") { va = a.nom; vb = b.nom; }
+    else if (effectiveCol === "assignation") { va = assignationOf(a); vb = assignationOf(b); }
     else { va = a.scores[effectiveCol] ? a.scores[effectiveCol].value : null; vb = b.scores[effectiveCol] ? b.scores[effectiveCol].value : null; }
     if (va === null || va === undefined) va = -1;
     if (vb === null || vb === undefined) vb = -1;
@@ -428,19 +478,22 @@ function render(data) {
  
   const wrap = document.getElementById("tableWrap");
  
+  lastRender = { data, rows };
+
   if (rows.length === 0) {
-    wrap.innerHTML = `<div class="empty-state">Aucun chauffeur pour cette compagnie.</div>`;
+    wrap.innerHTML = `<div class="empty-state">Aucun chauffeur pour ces filtres.</div>`;
     document.getElementById("statusLine").textContent = "";
     return;
   }
  
-  const thNom = `<th data-col="nom" class="${effectiveCol === "nom" ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">Nom complet</th>`;
+  const thNom = `<th data-col="nom" class="${effectiveCol === "nom" ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">Nom complet</th>`
+    + `<th data-col="assignation" class="${effectiveCol === "assignation" ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">Assignation</th>`;
   const thSemaines = data.semaines.map(s =>
-    `<th data-col="${s}" class="${effectiveCol === s ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">${data.semaineLabels[s]}</th>`
+    `<th data-col="${escapeHtml(s)}" class="${effectiveCol === s ? "sorted " + (effectiveAsc ? "asc" : "") : ""}">${escapeHtml(data.semaineLabels[s])}</th>`
   ).join("");
  
   const bodyRows = rows.map(c => {
-    const nomCell = `<td class="nom">${c.nom}   ---  [${c.poste}]</td>`;
+    const nomCell = `<td class="nom">${escapeHtml(c.nom)}</td><td class="assignation">${escapeHtml(assignationOf(c))}</td>`;
     const scoreCells = data.semaines.map(s => {
       const cell = c.scores[s];
       const v = cell ? cell.value : null;
@@ -454,7 +507,7 @@ function render(data) {
             .map(key => `${BREAKDOWN_LABELS[key]} : ${cell.breakdown[key] === null ? "—" : cell.breakdown[key]}`)
             .join("\n")
         : "";
-      return `<td class="score" style="background:${style.bg}; color:${style.fg}" title="${tooltip}">${display}</td>`;
+      return `<td class="score" style="background:${style.bg}; color:${style.fg}" title="${escapeHtml(tooltip)}">${escapeHtml(display)}</td>`;
     }).join("");
     return `<tr>${nomCell}${scoreCells}</tr>`;
   }).join("");
@@ -560,10 +613,8 @@ function refresh() {
  
     // Le graphique a besoin des mêmes lignes filtrées (et triées, l'ordre
     // n'a pas d'importance pour lui) que le tableau.
-    const rows = data.chauffeurs.filter(c =>
-      state.compagnie === "__ALL__" || c.compagnie === state.compagnie
-    );
- 
+    const rows = filterRows(data);
+
     document.getElementById("tableWrap").style.display = state.display === "table" ? "" : "none";
     document.getElementById("chartWrap").style.display = state.display === "chart" ? "block" : "none";
  
@@ -581,7 +632,74 @@ document.getElementById("companyFilter").addEventListener("change", e => {
   sortCol = null;
   refresh();
 });
- 
+
+document.getElementById("assignationFilter").addEventListener("change", e => {
+  state.assignation = e.target.value;
+  setCookie("bulletin_assignation", state.assignation);
+  sortCol = null;
+  refresh();
+});
+
+// Export Excel (.xlsx) du tableau tel qu'affiché (filtres, tri et semaines courants),
+// avec les couleurs des paliers de notes.
+function cssVarToArgb(name) {
+  const v = getComputedStyle(document.body).getPropertyValue(name).trim().replace("#", "");
+  return "FF" + v.toUpperCase();
+}
+
+async function exportExcel() {
+  if (!lastRender || lastRender.rows.length === 0) { alert("Aucune donnée à exporter."); return; }
+  if (typeof ExcelJS === "undefined") { alert("La librairie Excel n'est pas chargée."); return; }
+  const { data, rows } = lastRender;
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Bulletins");
+  ws.columns = [
+    { header: "Nom complet", key: "nom", width: 32 },
+    { header: "Assignation", key: "assignation", width: 22 },
+    ...data.semaines.map(s => ({ header: data.semaineLabels[s], key: s, width: 11 }))
+  ];
+
+  const header = ws.getRow(1);
+  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  header.alignment = { horizontal: "center", vertical: "middle" };
+  header.eachCell(cell => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF464444" } };
+  });
+  ws.views = [{ state: "frozen", xSplit: 1, ySplit: 1 }];
+
+  rows.forEach(c => {
+    const row = ws.addRow([c.nom, assignationOf(c), ...data.semaines.map(() => null)]);
+    row.getCell(1).font = { bold: true };
+    data.semaines.forEach((s, i) => {
+      const cell = row.getCell(3 + i);
+      const sc = c.scores[s];
+      const v = sc ? sc.value : null;
+      const style = SCORE_STYLES[scoreClass(v)];
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cssVarToArgb(style.bgVar) } };
+      cell.font = { bold: true, color: { argb: cssVarToArgb(style.fgVar) } };
+      cell.alignment = { horizontal: "center" };
+      if (v !== null && v !== undefined) {
+        cell.value = v;
+        cell.numFmt = sc.shunt ? '0.##" (s)"' : "0.##";
+      }
+    });
+  });
+
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 2 + data.semaines.length } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `bulletins_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+document.getElementById("exportExcel").addEventListener("click", exportExcel);
+
 document.querySelectorAll(".controls .tabs .tab").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".controls .tabs .tab").forEach(t => t.classList.remove("active"));

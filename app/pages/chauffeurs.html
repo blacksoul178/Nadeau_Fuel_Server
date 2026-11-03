@@ -122,9 +122,9 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.operatorNo ?? ''}</td>
-          <td>${escapeHtml(r.Nom ?? '')}</td>
-          <td>${r.Groupe ?? ''}</td>
+          <td>${escapeHtml(r.operatorNo)}</td>
+          <td>${escapeHtml(r.Nom)}</td>
+          <td>${escapeHtml(r.Groupe)}</td>
           <td>${toBoolOrNull(r.isBroker) ? 'Oui' : 'Non'}</td>
         `;
         // Add click listener to toggle selection
@@ -138,7 +138,7 @@
 
     // Utility
     function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
     function getCookie(name) {

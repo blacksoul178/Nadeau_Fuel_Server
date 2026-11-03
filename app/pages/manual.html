@@ -120,6 +120,8 @@
       return null; // inconnu
     }
 
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function autoResizeTextarea(textarea) {
       if (!textarea) return;
       textarea.style.height = 'auto';
@@ -264,17 +266,17 @@
 
             rows.forEach(r => {
               const tr = document.createElement('tr');
-              let controls = `<button class="btn-edit" data-operator-no="${r.operatorNo}">Modifier</button>`;
+              let controls = `<button class="btn-edit" data-operator-no="${escapeHtml(r.operatorNo)}">Modifier</button>`;
               tr.innerHTML = `
-                <td>${r.operatorNo ?? ''}</td>
-                <td>${r.Nom ?? ''}</td>
-                <td class="cell-FKDG" data-field="Groupe" data-operator-no="${r.operatorNo}"><span class="val">${r.Groupe?? ''}</span></td>
-                <td class="cell-sd" data-field="StartDate" data-operator-no="${r.operatorNo}"><span class="val">${r.StartDate ?? ''}</span></td>
-                <td class="cell-dd" data-field="deletedDate" data-operator-no="${r.operatorNo}"><span class="val">${r.DeletedDate ?? ''}</span></td>
-                <td class="cell-facturable" data-field="facturable" data-operator-no="${r.operatorNo}"><span class="val">${r.FacturablePetitVehicule ?? ''}</span></td>
-                <td class="cell-superviseur" data-field="superviseur" data-operator-no="${r.operatorNo}"><span class="val">${r.Superviseur ?? ''}</span></td>
-                <td class="cell-rapport" data-field="rapport" data-operator-no="${r.operatorNo}"><span class="val">${r.RapportIFTA ?? ''}</span></td>
-                <td class="cell-pret" data-field="pret" data-operator-no="${r.operatorNo}"><span class="val">${r.Pret ?? ''}</span></td>
+                <td>${escapeHtml(r.operatorNo)}</td>
+                <td>${escapeHtml(r.Nom)}</td>
+                <td class="cell-FKDG" data-field="Groupe" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.Groupe)}</span></td>
+                <td class="cell-sd" data-field="StartDate" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.StartDate)}</span></td>
+                <td class="cell-dd" data-field="deletedDate" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.DeletedDate)}</span></td>
+                <td class="cell-facturable" data-field="facturable" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.FacturablePetitVehicule)}</span></td>
+                <td class="cell-superviseur" data-field="superviseur" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.Superviseur)}</span></td>
+                <td class="cell-rapport" data-field="rapport" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.RapportIFTA)}</span></td>
+                <td class="cell-pret" data-field="pret" data-operator-no="${escapeHtml(r.operatorNo)}"><span class="val">${escapeHtml(r.Pret)}</span></td>
                 <td>${controls}</td>
               `;
               frag.appendChild(tr);
@@ -379,7 +381,7 @@
                     facturableCell.parentElement.innerHTML = `<input class="inp-facturable" type="checkbox" ${facturableVal === true || facturableVal === "true" ? "checked" : ""}>`;
                   }
                   if (superviseurCell) {
-                    superviseurCell.parentElement.innerHTML = `<input class="inp-superviseur" autocomplete="off" value="${superviseurVal}">`;
+                    superviseurCell.parentElement.innerHTML = `<input class="inp-superviseur" autocomplete="off" value="${escapeHtml(superviseurVal)}">`;
                   }
                   if (rapportCell) {
                     rapportCell.parentElement.innerHTML = `<input class="inp-rapport" type="checkbox"${rapportVal === true || rapportVal === "true" ? "checked" : ""}>`;
@@ -429,17 +431,17 @@
                         const updatedChauffeurs = allChauffeurs.find(c => c.operatorNo == operatorNo );
                         if (updatedChauffeurs) {
                           // Re-render this row with updated data
-                          const controls = `<button class="btn-edit" data-operator-no="${updatedChauffeurs.operatorNo}">Modifier</button>`;
+                          const controls = `<button class="btn-edit" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}">Modifier</button>`;
                           row.innerHTML = `
-                            <td>${updatedChauffeurs.operatorNo ?? ''}</td>
-                            <td>${updatedChauffeurs.Nom ?? ''}</td>
-                            <td class="cell-FKDG" data-field="Groupe" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.Groupe?? ''}</span></td>
-                            <td class="cell-sd" data-field="StartDate" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.startDate ?? ''}</span></td>
-                            <td class="cell-dd" data-field="DeletedDate" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.deletedDate ?? ''}</span></td>
-                            <td class="cell-facturable" data-field="facturable" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.facturablePetitVehicule ?? ''}</span></td>
-                            <td class="cell-superviseur" data-field="superviseur" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.superviseur ?? ''}</span></td>
-                            <td class="cell-rapport" data-field="rapport" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.rapportIFTA ?? ''}</span></td>
-                            <td class="cell-pret" data-field="pret" data-operator-no="${updatedChauffeurs.operatorNo}"><span class="val">${updatedChauffeurs.pret ?? ''}</span></td>
+                            <td>${escapeHtml(updatedChauffeurs.operatorNo)}</td>
+                            <td>${escapeHtml(updatedChauffeurs.Nom)}</td>
+                            <td class="cell-FKDG" data-field="Groupe" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.Groupe)}</span></td>
+                            <td class="cell-sd" data-field="StartDate" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.startDate)}</span></td>
+                            <td class="cell-dd" data-field="DeletedDate" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.deletedDate)}</span></td>
+                            <td class="cell-facturable" data-field="facturable" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.facturablePetitVehicule)}</span></td>
+                            <td class="cell-superviseur" data-field="superviseur" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.superviseur)}</span></td>
+                            <td class="cell-rapport" data-field="rapport" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.rapportIFTA)}</span></td>
+                            <td class="cell-pret" data-field="pret" data-operator-no="${escapeHtml(updatedChauffeurs.operatorNo)}"><span class="val">${escapeHtml(updatedChauffeurs.pret)}</span></td>
                             <td>${controls}</td>
                           `;
                           btn.dataset.editing = '0';

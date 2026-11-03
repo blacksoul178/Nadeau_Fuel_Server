@@ -31,6 +31,8 @@
     //Fetch Taux all week 
     const state = { data: [] };
 
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
  async function loadAll() {
       const res = await fetch('/api/taux/allWeek', { headers: { 'Accept': 'application/json' } });
       if (!res.ok)throw new Error('HTTP ' + res.status);
@@ -44,9 +46,9 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="col-120">${r.Annee ?? ''}</td>
-          <td>${r.Semaine ?? ''}</td>
-          <td>${r.PrixMoyen ?? ''}</td>
+          <td class="col-120">${escapeHtml(r.Annee)}</td>
+          <td>${escapeHtml(r.Semaine)}</td>
+          <td>${escapeHtml(r.PrixMoyen)}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {

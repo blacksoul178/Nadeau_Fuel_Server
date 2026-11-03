@@ -80,6 +80,8 @@
 
     
     
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
       if (typeof v === 'boolean') return v;
       if (v == null) return null;
@@ -198,17 +200,17 @@
             rows.forEach(r => {
               const tr = document.createElement('tr');
               tr.innerHTML = `
-                <td>${r.unitNumber ?? ''}</td>
-                <td>${r.unitLicenceNumber ?? ''}</td>
+                <td>${escapeHtml(r.unitNumber)}</td>
+                <td>${escapeHtml(r.unitLicenceNumber)}</td>
                 <td>${r.isUsable === true ? 'Oui' : r.isUsable === false ? 'Non' : ''}</td>
-                <td>${r.unitDescription ?? ''}</td>
+                <td>${escapeHtml(r.unitDescription)}</td>
                 <td>${r.unitIsIFTAPlated === true ? 'Oui' : r.unitIsIFTAPlated === false ? 'Non' : ''}</td>
-                <td>${r.unitProvince ?? ''}</td>
-                <td>${r.unitFuelType ?? ''}</td>
-                <td>${r.GL ?? ''}</td>
-                <td>${r.nomCommunGL ?? ''}</td>
-                <td>${r.Propriétaire ?? ''}</td>
-                <td>${r.Ref ?? ''}</td>
+                <td>${escapeHtml(r.unitProvince)}</td>
+                <td>${escapeHtml(r.unitFuelType)}</td>
+                <td>${escapeHtml(r.GL)}</td>
+                <td>${escapeHtml(r.nomCommunGL)}</td>
+                <td>${escapeHtml(r.Propriétaire)}</td>
+                <td>${escapeHtml(r.Ref)}</td>
               `;
               frag.appendChild(tr);
             });

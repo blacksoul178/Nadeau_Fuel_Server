@@ -58,6 +58,8 @@
   <script>
     const state = { data: [] };
 
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     // Fetch ALL once (small table)
     async function loadAll() {
       const res = await fetch('/api/admin/syncrunsError', { headers: { 'Accept': 'application/json' } });
@@ -73,11 +75,11 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.RunName ?? ''}</td>
-          <td>${r.StartedAt ?? ''}</td>
-          <td>${r.FinishedAt ?? ''}</td>
-          <td>${r.Status ?? ''}</td>
-          <td>${r.ErrorMessage ?? ''}</td>
+          <td>${escapeHtml(r.RunName)}</td>
+          <td>${escapeHtml(r.StartedAt)}</td>
+          <td>${escapeHtml(r.FinishedAt)}</td>
+          <td>${escapeHtml(r.Status)}</td>
+          <td>${escapeHtml(r.ErrorMessage)}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {

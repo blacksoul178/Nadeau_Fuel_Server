@@ -323,6 +323,8 @@
     }
 
     
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function cleanCell(cell) {
         return (cell === 0 || cell === "0" || cell === null) ? "" : cell;
     }
@@ -343,7 +345,7 @@
         //Build header
         let headerHTML = "<tr>";
         data.headers.forEach(h => {
-        headerHTML += `<th>${h}</th>`;
+        headerHTML += `<th>${escapeHtml(h)}</th>`;
         });
         headerHTML += "</tr>";
         head.innerHTML = headerHTML;
@@ -373,7 +375,7 @@
                         }
                     }
 
-                    rowHTML += `<td ${style}>${cleaned ?? ""}</td>`;
+                    rowHTML += `<td ${style}>${escapeHtml(cleaned)}</td>`;
                 });
 
                 rowHTML += "</tr>";
@@ -384,7 +386,7 @@
         data.rows.forEach(row => {
             let rowHTML = "<tr>";
             row.forEach(cell => {
-                rowHTML += `<td>${cell}</td>`;
+                rowHTML += `<td>${escapeHtml(String(cell))}</td>`;
             });
             rowHTML += "</tr>";
             body.innerHTML += rowHTML;

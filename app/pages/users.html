@@ -159,29 +159,6 @@
         </div>
     </div>
 
-    <!-- Change Own Password Modal -->
-    <div id="changePasswordModal" style="display: none;">
-        <div>
-            <h3>Changer mon mot de passe</h3>
-            <div>
-                <label for="currentPassword">Mot de passe actuel *</label>
-                <input type="password" id="currentPassword" placeholder="Entrez votre mot de passe actuel" />
-            </div>
-            <div>
-                <label for="newPassword2">Nouveau mot de passe *</label>
-                <input type="password" id="newPassword2" placeholder="Entrez le nouveau mot de passe" />
-            </div>
-            <div>
-                <label for="newPassword2Confirm">Confirmer nouveau mot de passe *</label>
-                <input type="password" id="newPassword2Confirm" placeholder="Confirmez le nouveau mot de passe" />
-            </div>
-            <div>
-                <button id="cancelPwdBtn" type="button">Annuler</button>
-                <button id="submitPwdBtn" type="button">Changer</button>
-            </div>
-        </div>
-    </div>
-
     <script>
         const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
@@ -245,8 +222,8 @@
                     <td>${u.IsReports ? 'Oui' : 'Non'}</td>
                     <td class="${isDisabled ? 'disabled-text' : ''}">${isDisabled ? 'Oui' : 'Non'}</td>
                     <td>
-                        <button class="btn-edit" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}" data-isadmin="${u.IsAdmin}" data-issuperuser="${u.IsSuperUser}" data-isreports="${u.IsReports}" data-isdisabled="${u.IsDisabled}">Éditer</button>
-                        <button class="btn-delete" data-userid="${u.id}" data-username="${escapeHtml(u.AppUser)}">Désactivé</button>
+                        <button class="btn-edit" data-userid="${escapeHtml(u.id)}" data-username="${escapeHtml(u.AppUser)}" data-isadmin="${escapeHtml(u.IsAdmin)}" data-issuperuser="${escapeHtml(u.IsSuperUser)}" data-isreports="${escapeHtml(u.IsReports)}" data-isdisabled="${escapeHtml(u.IsDisabled)}">Éditer</button>
+                        <button class="btn-delete" data-userid="${escapeHtml(u.id)}" data-username="${escapeHtml(u.AppUser)}">Désactivé</button>
                     </td>
                 `;
                 tb.appendChild(tr);
@@ -256,7 +233,7 @@
         }
 
         function escapeHtml(s) {
-            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
         // Create user
@@ -347,68 +324,68 @@
             setTimeout(() => { d.classList.remove('visible'); setTimeout(() => d.remove(), 400); }, 3500);
         }
 
-        // Change password modal
-        const modal = document.getElementById('changePasswordModal');
-        const changePwdBtn = document.getElementById('changePwdBtn');
-        const cancelPwdBtn = document.getElementById('cancelPwdBtn');
-        const submitPwdBtn = document.getElementById('submitPwdBtn');
+        // // Change password modal        NOT USED ANYMORE
+        // const modal = document.getElementById('changePasswordModal');
+        // const changePwdBtn = document.getElementById('changePwdBtn');
+        // const cancelPwdBtn = document.getElementById('cancelPwdBtn');
+        // const submitPwdBtn = document.getElementById('submitPwdBtn');
 
-        if (changePwdBtn) {
-            changePwdBtn.addEventListener('click', () => {
-                document.getElementById('currentPassword').value = '';
-                document.getElementById('newPassword2').value = '';
-                document.getElementById('newPassword2Confirm').value = '';
-                if (modal) modal.style.display = 'flex';
-            });
-        }
+        // if (changePwdBtn) {
+        //     changePwdBtn.addEventListener('click', () => {
+        //         document.getElementById('currentPassword').value = '';
+        //         document.getElementById('newPassword2').value = '';
+        //         document.getElementById('newPassword2Confirm').value = '';
+        //         if (modal) modal.style.display = 'flex';
+        //     });
+        // }
 
-        if (cancelPwdBtn) {
-            cancelPwdBtn.addEventListener('click', () => {
-                if (modal) modal.style.display = 'none';
-            });
-        }
+        // if (cancelPwdBtn) {
+        //     cancelPwdBtn.addEventListener('click', () => {
+        //         if (modal) modal.style.display = 'none';
+        //     });
+        // }
 
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
-        }
+        // if (modal) {
+        //     modal.addEventListener('click', (e) => {
+        //         if (e.target === modal) {
+        //             modal.style.display = 'none';
+        //         }
+        //     });
+        // }
 
-        submitPwdBtn.addEventListener('click', async () => {
-            const currentPassword = document.getElementById('currentPassword').value.trim();
-            const newPassword = document.getElementById('newPassword2').value.trim();
-            const confirmPassword = document.getElementById('newPassword2Confirm').value.trim();
+        // submitPwdBtn.addEventListener('click', async () => {
+        //     const currentPassword = document.getElementById('currentPassword').value.trim();
+        //     const newPassword = document.getElementById('newPassword2').value.trim();
+        //     const confirmPassword = document.getElementById('newPassword2Confirm').value.trim();
 
-            if (!currentPassword || !newPassword || !confirmPassword) {
-                alert('Tous les champs sont obligatoires');
-                return;
-            }
+        //     if (!currentPassword || !newPassword || !confirmPassword) {
+        //         alert('Tous les champs sont obligatoires');
+        //         return;
+        //     }
 
-            if (newPassword !== confirmPassword) {
-                alert('Les nouveaux mots de passe ne correspondent pas');
-                return;
-            }
+        //     if (newPassword !== confirmPassword) {
+        //         alert('Les nouveaux mots de passe ne correspondent pas');
+        //         return;
+        //     }
 
-            try {
-                const res = await fetch('/api/admin/users/changePassword', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-                    body: JSON.stringify({ currentPassword, newPassword })
-                });
+        //     try {
+        //         const res = await fetch('/api/admin/users/changePassword', {
+        //             method: 'POST',
+        //             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+        //             body: JSON.stringify({ currentPassword, newPassword })
+        //         });
 
-                if (!res.ok) {
-                    const txt = await res.text();
-                    throw new Error(txt);
-                }
+        //         if (!res.ok) {
+        //             const txt = await res.text();
+        //             throw new Error(txt);
+        //         }
 
-                showFlash('Mot de passe changé avec succès.');
-                modal.style.display = 'none';
-            } catch (err) {
-                alert('Erreur: ' + err.message);
-            }
-        });
+        //         showFlash('Mot de passe changé avec succès.');
+        //         modal.style.display = 'none';
+        //     } catch (err) {
+        //         alert('Erreur: ' + err.message);
+        //     }
+        // });
 
         // Change user password modal (for admins)
         const userPwdModal = document.getElementById('changeUserPasswordModal');

@@ -89,6 +89,11 @@ func syncrunsAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -152,6 +157,10 @@ SELECT run_name
 	json.NewEncoder(w).Encode(out)
 }
 func logsApiHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
 
 	var logFilePath = `server.log`
 
@@ -279,6 +288,11 @@ func adminDriversUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -383,6 +397,11 @@ func adminDriversUpdateHandler(w http.ResponseWriter, r *http.Request) {
 func adminAddDriverHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -532,6 +551,11 @@ func adminAddDriverHandler(w http.ResponseWriter, r *http.Request) {
 func adminChauffeursAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -1096,6 +1120,11 @@ func petrolieresAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -1308,6 +1337,11 @@ func transactionsAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -1461,6 +1495,11 @@ func prixFuelGlobalSemaineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -1550,6 +1589,11 @@ func prixFuelGlobalJourHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -1631,6 +1675,11 @@ SELECT TOP (365) [Date]
 func prixFuelDiffSemaineHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -1729,6 +1778,11 @@ func prixFuelDiffJourHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -1815,6 +1869,11 @@ SELECT TOP (1000) [Date]
 func prixFuelDiffRegionSemaineHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -1912,6 +1971,11 @@ func prixFuelDiffRegionJourHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -2001,6 +2065,11 @@ func prixFuelSemaineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -2075,6 +2144,11 @@ func prixFuelJourHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -2141,6 +2215,11 @@ SELECT [Date]
 func prixFuelRegionSemaineHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -2218,6 +2297,11 @@ func prixFuelRegionJourHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -2284,6 +2368,11 @@ SELECT TOP (1000) [Date]
 func syncStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -2377,6 +2466,11 @@ func updateNoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	type UpdateNoteRequest struct {
 		OilcoId int    `json:"oilcoId"`
 		Note    string `json:"note"`
@@ -2424,6 +2518,11 @@ func updateNoteHandler(w http.ResponseWriter, r *http.Request) {
 func villesAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 
@@ -2501,6 +2600,11 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -2567,7 +2671,7 @@ func bulletinMonthlyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Select only the columns expected by the response struct
 	query := `
-	SELECT Nom, Semaine, ScoreMAJ, ScoreMAJ_Shunt, Poste, DispatchGroup, SécuritéTotal, AccélérationsTotal, DécélérationsTotal, ArrêtsTotal, ScoreTotal FROM dbo.v_bulletin_isaac_monthly
+	SELECT Nom, Semaine, ScoreMAJ, ScoreMAJ_Shunt, Poste, DispatchGroup, SécuritéTotal, AccélérationsTotal, DécélérationsTotal, ArrêtsTotal, ScoreTotal, Assignation FROM dbo.v_bulletin_isaac_monthly
 	`
 
 	rows, err := db.QueryContext(ctx, query)
@@ -2590,6 +2694,7 @@ func bulletinMonthlyHandler(w http.ResponseWriter, r *http.Request) {
 		DécélérationsTotal string `json:"DécélérationsTotal"`
 		ArrêtsTotal        string `json:"ArrêtsTotal"`
 		ScoreTotal         string `json:"ScoreTotal"`
+		Assignation        string `json:"Assignation"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -2606,8 +2711,9 @@ func bulletinMonthlyHandler(w http.ResponseWriter, r *http.Request) {
 			DécélérationsTotal sql.NullString
 			ArrêtsTotal        sql.NullString
 			ScoreTotal         sql.NullString
+			Assignation        sql.NullString
 		)
-		if err := rows.Scan(&Nom, &Semaine, &ScoreMAJ, &ScoreMAJ_Shunt, &Poste, &DispatchGroup, &SécuritéTotal, &AccélérationsTotal, &DécélérationsTotal, &ArrêtsTotal, &ScoreTotal); err != nil {
+		if err := rows.Scan(&Nom, &Semaine, &ScoreMAJ, &ScoreMAJ_Shunt, &Poste, &DispatchGroup, &SécuritéTotal, &AccélérationsTotal, &DécélérationsTotal, &ArrêtsTotal, &ScoreTotal, &Assignation); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on bulletinMonthlyHandler: " + err.Error())
 			return
@@ -2625,6 +2731,7 @@ func bulletinMonthlyHandler(w http.ResponseWriter, r *http.Request) {
 			DécélérationsTotal: DécélérationsTotal.String,
 			ArrêtsTotal:        ArrêtsTotal.String,
 			ScoreTotal:         ScoreTotal.String,
+			Assignation:        Assignation.String,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -2647,7 +2754,7 @@ func bulletinAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Select only the columns expected by the response struct
 	query := `
-	SELECT Nom, Semaine, ScoreMAJ, ScoreMAJ_Shunt, Poste, DispatchGroup, SécuritéTotal, AccélérationsTotal, DécélérationsTotal, ArrêtsTotal, ScoreTotal FROM dbo.v_bulletin_isaac_All
+	SELECT Nom, Semaine, ScoreMAJ, ScoreMAJ_Shunt, Poste, DispatchGroup, SécuritéTotal, AccélérationsTotal, DécélérationsTotal, ArrêtsTotal, ScoreTotal, Assignation FROM dbo.v_bulletin_isaac_All
 	`
 
 	rows, err := db.QueryContext(ctx, query)
@@ -2670,6 +2777,7 @@ func bulletinAllHandler(w http.ResponseWriter, r *http.Request) {
 		DécélérationsTotal string `json:"DécélérationsTotal"`
 		ArrêtsTotal        string `json:"ArrêtsTotal"`
 		ScoreTotal         string `json:"ScoreTotal"`
+		Assignation        string `json:"Assignation"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -2686,8 +2794,9 @@ func bulletinAllHandler(w http.ResponseWriter, r *http.Request) {
 			DécélérationsTotal sql.NullString
 			ArrêtsTotal        sql.NullString
 			ScoreTotal         sql.NullString
+			Assignation        sql.NullString
 		)
-		if err := rows.Scan(&Nom, &Semaine, &ScoreMAJ, &ScoreMAJ_Shunt, &Poste, &DispatchGroup, &SécuritéTotal, &AccélérationsTotal, &DécélérationsTotal, &ArrêtsTotal, &ScoreTotal); err != nil {
+		if err := rows.Scan(&Nom, &Semaine, &ScoreMAJ, &ScoreMAJ_Shunt, &Poste, &DispatchGroup, &SécuritéTotal, &AccélérationsTotal, &DécélérationsTotal, &ArrêtsTotal, &ScoreTotal, &Assignation); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on bulletinAllHandler: " + err.Error())
 			return
@@ -2705,6 +2814,7 @@ func bulletinAllHandler(w http.ResponseWriter, r *http.Request) {
 			ScoreTotal:         ScoreTotal.String,
 			Poste:              Poste.String,
 			DispatchGroup:      DispatchGroup.String,
+			Assignation:        Assignation.String,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -3627,6 +3737,11 @@ func driversUpdateGroupHandler(w http.ResponseWriter, r *http.Request) {
 func brokersAddCo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !IsAdmin(r) && !IsSuperUser(r) {
+		respondWithError(w, http.StatusForbidden, "Unauthorized")
 		return
 	}
 

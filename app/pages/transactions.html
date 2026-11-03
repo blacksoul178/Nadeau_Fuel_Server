@@ -139,6 +139,8 @@ tr.rating-3 {
     const PREVIEW_MAX_LENGTH = 300;
 
     
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function getLastSaturday() {
         const d = new Date();
         d.setDate(d.getDate() - ((d.getDay() + 1) % 7));
@@ -268,15 +270,15 @@ tr.rating-3 {
         tr.dataset.oilcoId = r.OilCoID;
         tr.dataset.note = r.Note;
         tr.innerHTML = `
-          <td>${r.Compte ?? ''}</td>
-          <td>${r.OilCoName ?? ''}</td>
-          <td>${r.OilCoName ? (r.OilCoName + '_' + lastSatDateStr) : ''}</td>
-          <td>${r.DerniereSynchro.slice(0,10) ?? ''}</td>
-          <td>${r.DerniereTransaction.slice(0,10) ?? ''}</td>
-          <td>${r.JoursDeRetard ?? ''}</td>
+          <td>${escapeHtml(r.Compte)}</td>
+          <td>${escapeHtml(r.OilCoName)}</td>
+          <td>${r.OilCoName ? escapeHtml(r.OilCoName + '_' + lastSatDateStr) : ''}</td>
+          <td>${escapeHtml(r.DerniereSynchro.slice(0,10))}</td>
+          <td>${escapeHtml(r.DerniereTransaction.slice(0,10))}</td>
+          <td>${escapeHtml(r.JoursDeRetard)}</td>
           <td>${status}</td>
-          <td class="note-cell">${r.Note}</td>
-          <td><button class="edit-note-btn" data-oilco-id="${r.OilCoID}">Edit</button></td>
+          <td class="note-cell">${escapeHtml(r.Note)}</td>
+          <td><button class="edit-note-btn" data-oilco-id="${escapeHtml(r.OilCoID)}">Edit</button></td>
           `;
         tb.appendChild(tr);
       });
@@ -305,7 +307,7 @@ tr.rating-3 {
 
       // Enter edit mode
       const currentNote = noteCell.textContent;
-      noteCell.innerHTML = `<textarea class="note-textarea" style="width: 100%; min-height: 60px; padding: 5px;">${currentNote}</textarea>`;
+      noteCell.innerHTML = `<textarea class="note-textarea" style="width: 100%; min-height: 60px; padding: 5px;">${escapeHtml(currentNote)}</textarea>`;
       const textarea = noteCell.querySelector('.note-textarea');
       textarea.focus();
       textarea.select();
@@ -351,13 +353,13 @@ tr.rating-3 {
         }
 
         // Update UI
-        noteCell.innerHTML = newNote;
+        noteCell.innerHTML = escapeHtml(newNote);
         btn.textContent = 'Edit';
         alert('Note updated successfully ✅');
       } catch (e) {
         alert('Error updating note: ' + e.message);
         // Revert to edit mode
-        noteCell.innerHTML = `<textarea class="note-textarea" style="width: 100%; min-height: 60px; padding: 5px;">${textarea.value}</textarea>`;
+        noteCell.innerHTML = `<textarea class="note-textarea" style="width: 100%; min-height: 60px; padding: 5px;">${escapeHtml(textarea.value)}</textarea>`;
       }
     }
 

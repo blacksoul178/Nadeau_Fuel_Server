@@ -61,6 +61,8 @@
   <script>
     const state = { data: [] };
 
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     // Fetch ALL once (small table)
     async function loadAll() {
       const res = await fetch('/api/petrolieres/allPetrolieres', { headers: { 'Accept': 'application/json' } });
@@ -85,9 +87,9 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.OilCoName ?? ''}</td>
-          <td>${r.Compte ?? ''}</td>
-          <td>${r.Banner ?? ''}</td>
+          <td>${escapeHtml(r.OilCoName)}</td>
+          <td>${escapeHtml(r.Compte)}</td>
+          <td>${escapeHtml(r.Banner)}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {

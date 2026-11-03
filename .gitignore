@@ -8,6 +8,7 @@
 *.so
 *.dylib
 
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -26,6 +27,8 @@ go.work.sum
 
 # env file
 .env
+.claude/
+.claude.env
 
 # Editor/IDE
 # .idea/
@@ -35,3 +38,5 @@ config.json
 /certs
 app.js
 logo.png
+DOCUMENTATION.md
+Isaac_Api.json

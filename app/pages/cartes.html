@@ -167,6 +167,8 @@
     }
     
     
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function parseBoolLoose(v) {          // i am not sure why i am parsing the data here instead of directly in the go api call but hey as long as it works for now, This is gonna bite me in the ass later
       if (typeof v === 'boolean') return v;
       if (v == null) return null;
@@ -334,21 +336,21 @@
 
             rows.forEach(r => {
               const tr = document.createElement('tr');
-              let controls = `<button class="btn-edit" data-cardid="${r.CardId}">Modifier</button>`;
+              let controls = `<button class="btn-edit" data-cardid="${escapeHtml(r.CardId)}">Modifier</button>`;
               if (CAN_DELETE) {
-                controls += ` <button class="btn-delete" data-cardid="${r.CardId}" data-cardnumber="${r.CardNumber}">Supprimer</button>`;
+                controls += ` <button class="btn-delete" data-cardid="${escapeHtml(r.CardId)}" data-cardnumber="${escapeHtml(r.CardNumber)}">Supprimer</button>`;
               }
               tr.innerHTML = `
-                <td>${r.Nom ?? ''}</td>
-                <td>${r.Nom_DispatchGroup ?? ''}</td>
-                <td data-field="CardNumber">${r.CardNumber ?? ''}</td>
-                <td class="cell-nip" data-field="NIP" data-cardid="${r.CardId}"><span class="val">${r.NIP ?? ''}</span></td>
-                <td data-field="OilCoName">${r.OilCoName ?? ''}</td>
-                <td class="cell-exp" data-field="Expiration" data-cardid="${r.CardId}"><span class="val">${r.Expiration ?? ''}</span></td>
-                <td class="cell-dr" data-field="DateRemise" data-cardid="${r.CardId}"><span class="val">${r.DateRemise ?? ''}</span></td>
-                <td class="cell-dre" data-field="DateReprise" data-cardid="${r.CardId}"><span class="val">${r.DateReprise ?? ''}</span></td>
-                <td data-field="Active">${r.Active ?? ''}</td>
-                <td data-field="Notes">${r.Notes ?? ''}</td>
+                <td>${escapeHtml(r.Nom)}</td>
+                <td>${escapeHtml(r.Nom_DispatchGroup)}</td>
+                <td data-field="CardNumber">${escapeHtml(r.CardNumber)}</td>
+                <td class="cell-nip" data-field="NIP" data-cardid="${escapeHtml(r.CardId)}"><span class="val">${escapeHtml(r.NIP)}</span></td>
+                <td data-field="OilCoName">${escapeHtml(r.OilCoName)}</td>
+                <td class="cell-exp" data-field="Expiration" data-cardid="${escapeHtml(r.CardId)}"><span class="val">${escapeHtml(r.Expiration)}</span></td>
+                <td class="cell-dr" data-field="DateRemise" data-cardid="${escapeHtml(r.CardId)}"><span class="val">${escapeHtml(r.DateRemise)}</span></td>
+                <td class="cell-dre" data-field="DateReprise" data-cardid="${escapeHtml(r.CardId)}"><span class="val">${escapeHtml(r.DateReprise)}</span></td>
+                <td data-field="Active">${escapeHtml(r.Active)}</td>
+                <td data-field="Notes">${escapeHtml(r.Notes)}</td>
                 <td>${controls}</td>
               `;
               frag.appendChild(tr);
@@ -426,7 +428,7 @@
                   const notesVal = notesCell ? notesCell.textContent.trim() : '';
 
                   if (nipCell) {
-                    nipCell.parentElement.innerHTML = `<input class="inp-nip" autocomplete="off" value="${nipVal}">`;
+                    nipCell.parentElement.innerHTML = `<input class="inp-nip" autocomplete="off" value="${escapeHtml(nipVal)}">`;
                   }
                   if (expCell) {
                     expCell.parentElement.innerHTML = `<input class="inp-exp" type="date" autocomplete="off" value="${expValDate}">`;
@@ -489,19 +491,19 @@
                         const updatedCarte = allCartes.find(c => c.CardId === Number(cardId));
                         if (updatedCarte) {
                           // Re-render this row with updated data
-                          const controls = `<button class="btn-edit" data-cardid="${updatedCarte.CardId}">Modifier</button>`;
-                          const deleteBtn = CAN_DELETE ? ` <button class="btn-delete" data-cardid="${updatedCarte.CardId}" data-cardnumber="${updatedCarte.CardNumber}">Supprimer</button>` : '';
+                          const controls = `<button class="btn-edit" data-cardid="${escapeHtml(updatedCarte.CardId)}">Modifier</button>`;
+                          const deleteBtn = CAN_DELETE ? ` <button class="btn-delete" data-cardid="${escapeHtml(updatedCarte.CardId)}" data-cardnumber="${escapeHtml(updatedCarte.CardNumber)}">Supprimer</button>` : '';
                           row.innerHTML = `
-                            <td>${updatedCarte.Nom ?? ''}</td>
-                            <td>${updatedCarte.Nom_DispatchGroup ?? ''}</td>
-                            <td data-field="CardNumber">${updatedCarte.CardNumber ?? ''}</td>
-                            <td class="cell-nip" data-field="NIP" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.NIP ?? ''}</span></td>
-                            <td data-field="OilCoName">${updatedCarte.OilCoName ?? ''}</td>
-                            <td class="cell-exp" data-field="Expiration" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.Expiration ?? ''}</span></td>
-                            <td class="cell-dr" data-field="DateRemise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateRemise ?? ''}</span></td>
-                            <td class="cell-dre" data-field="DateReprise" data-cardid="${updatedCarte.CardId}"><span class="val">${updatedCarte.DateReprise ?? ''}</span></td>
-                            <td data-field="Active">${updatedCarte.Active ?? ''}</td>
-                            <td data-field="Notes">${updatedCarte.Notes ?? ''}</td>
+                            <td>${escapeHtml(updatedCarte.Nom)}</td>
+                            <td>${escapeHtml(updatedCarte.Nom_DispatchGroup)}</td>
+                            <td data-field="CardNumber">${escapeHtml(updatedCarte.CardNumber)}</td>
+                            <td class="cell-nip" data-field="NIP" data-cardid="${escapeHtml(updatedCarte.CardId)}"><span class="val">${escapeHtml(updatedCarte.NIP)}</span></td>
+                            <td data-field="OilCoName">${escapeHtml(updatedCarte.OilCoName)}</td>
+                            <td class="cell-exp" data-field="Expiration" data-cardid="${escapeHtml(updatedCarte.CardId)}"><span class="val">${escapeHtml(updatedCarte.Expiration)}</span></td>
+                            <td class="cell-dr" data-field="DateRemise" data-cardid="${escapeHtml(updatedCarte.CardId)}"><span class="val">${escapeHtml(updatedCarte.DateRemise)}</span></td>
+                            <td class="cell-dre" data-field="DateReprise" data-cardid="${escapeHtml(updatedCarte.CardId)}"><span class="val">${escapeHtml(updatedCarte.DateReprise)}</span></td>
+                            <td data-field="Active">${escapeHtml(updatedCarte.Active)}</td>
+                            <td data-field="Notes">${escapeHtml(updatedCarte.Notes)}</td>
                             <td>${controls}${deleteBtn}</td>
                           `;
                           btn.dataset.editing = '0';
@@ -537,7 +539,7 @@
             box.className = 'modal-box';
             box.innerHTML = `
               <h3>Confirmation suppression</h3>
-              <p>Attention: suppression définitive de la carte <strong>${cardNumber}</strong>.</p>
+              <p>Attention: suppression définitive de la carte <strong>${escapeHtml(cardNumber)}</strong>.</p>
               <p>Pour confirmer, entrez le numéro de carte dans la première case, et le mot <strong>SUPPRIMER</strong> (sensible à la casse) dans la seconde case.</p>
               <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
                 <input id="confirm-card" placeholder="Numéro carte" value="">

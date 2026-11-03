@@ -136,10 +136,10 @@
       rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.id ?? ''}</td>
-          <td>${r.Nom_Commun ?? ''}</td>
-          <td>${r.Nom_Legal ?? ''}</td>
-          <td>${r.Acomba ?? ''}</td>
+          <td>${escapeHtml(r.id)}</td>
+          <td>${escapeHtml(r.Nom_Commun)}</td>
+          <td>${escapeHtml(r.Nom_Legal)}</td>
+          <td>${escapeHtml(r.Acomba)}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {
@@ -149,6 +149,8 @@
       });
       document.getElementById('count').textContent = rows.length + ' résultat(s)';
     }
+
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
     // Helper to read cookie by name
     function getCookie(name) {
