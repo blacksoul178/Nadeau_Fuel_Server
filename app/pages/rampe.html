@@ -12,17 +12,25 @@
 
 
 <main class="container">
-    <label for="panel">Prix attendu: <br>
-        Gros réservoir: Rack Valéro - 0.1075$/L<br>
-    Petits réservoirs: Rack Valéro - 0.0355$/L</label>
-<section class="panel">
+    <style>
+      .gros  { color: #1a7f37; font-weight: 600; }
+      .petit { color: #d9730d; font-weight: 600; }
+      .sep   { color: #999; padding: 0 4px; }
+      #tbl td.prix { white-space: nowrap; }
+    </style>
+    <label for="panel">Prix Rack: <br>
+        <span class="gros">Gros réservoir</span>: Rack Valéro - 0.1075$/L<br>
+        <span class="petit">Petits réservoirs</span>: Rack Valéro - 0.0355$/L</label>
+<section class="panel" style="overflow-x:auto">
       <table id="tbl" class="table">
         <thead>
           <tr>
             <th class="col-120">Date</th>
-            <th class="col-80">ULSDQC1</th>
-            <th class="col-200">GrosReservoir</th>
-            <th class="col-200">PetitReservoir</th>
+            <th class="col-200">ULSDQC1</th>
+            <th class="col-200">Coloré (B)</th>
+            <th class="col-200">Coloré -40</th>
+            <th class="col-200">Mazout Int</th>
+            <th class="col-200">Mazout Ext</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -35,6 +43,14 @@
     const state = { data: [] };
 
     function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // "prix | gros (vert) | petit (orange)"; tiret si le prix n'existe pas (anciennes dates)
+    function cell(prix, gros, petit) {
+      if (!prix) return '<span class="sep">—</span>';
+      return `${escapeHtml(prix)}<span class="sep">|</span>` +
+             `<span class="gros">${escapeHtml(gros)}</span><span class="sep">|</span>` +
+             `<span class="petit">${escapeHtml(petit)}</span>`;
+    }
 
     async function loadAll() {
       const res = await fetch('/api/rampe/allRampe', { headers: { 'Accept': 'application/json' } });
@@ -50,9 +66,11 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${escapeHtml(r.Date)}</td>
-          <td>${escapeHtml(r.ULSDQC1)}</td>
-          <td>${escapeHtml(r.GrosReservoir)}</td>
-          <td>${escapeHtml(r.PetitReservoir)}</td>
+          <td class="prix">${cell(r.ULSDQC1, r.GrosReservoir, r.PetitReservoir)}</td>
+          <td class="prix">${cell(r.ColoreB, r.ColoreBGros, r.ColoreBPetit)}</td>
+          <td class="prix">${cell(r.Colore40, r.Colore40Gros, r.Colore40Petit)}</td>
+          <td class="prix">${cell(r.MazoutInt, r.MazoutIntGros, r.MazoutIntPetit)}</td>
+          <td class="prix">${cell(r.MazoutExt, r.MazoutExtGros, r.MazoutExtPetit)}</td>
           `;
           // Add click listener to toggle selection
         tr.addEventListener('click', function() {

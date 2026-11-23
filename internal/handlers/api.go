@@ -2610,8 +2610,13 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Test query - get column info first
 	query := `
-	SELECT 
-	[Date], PrixULSDQC1, GrosReservoir, PetitReservoir from dbo.valeroRackPrice
+	SELECT
+	[Date], PrixULSDQC1, GrosReservoir, PetitReservoir,
+	CONVERT(decimal(10,4), ColoreB   / 100.0), ColoreBGros,   ColoreBPetit,
+	CONVERT(decimal(10,4), ULSD1     / 100.0), Colore40Gros,  Colore40Petit,
+	CONVERT(decimal(10,4), MazoutInt / 100.0), MazoutIntGros, MazoutIntPetit,
+	CONVERT(decimal(10,4), MazoutExt / 100.0), MazoutExtGros, MazoutExtPetit
+	from dbo.valeroRackPrice
 	order by [date] desc;
 	`
 
@@ -2628,6 +2633,19 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 		PrixULSDQC1    string `json:"ULSDQC1"`
 		GrosReservoir  string `json:"GrosReservoir"`
 		PetitReservoir string `json:"PetitReservoir"`
+
+		ColoreB         string `json:"ColoreB"`
+		ColoreBGros     string `json:"ColoreBGros"`
+		ColoreBPetit    string `json:"ColoreBPetit"`
+		Colore40        string `json:"Colore40"`
+		Colore40Gros    string `json:"Colore40Gros"`
+		Colore40Petit   string `json:"Colore40Petit"`
+		MazoutInt       string `json:"MazoutInt"`
+		MazoutIntGros   string `json:"MazoutIntGros"`
+		MazoutIntPetit  string `json:"MazoutIntPetit"`
+		MazoutExt       string `json:"MazoutExt"`
+		MazoutExtGros   string `json:"MazoutExtGros"`
+		MazoutExtPetit  string `json:"MazoutExtPetit"`
 	}
 	out := make([]rowOut, 0, 256)
 
@@ -2637,8 +2655,14 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 			PrixULSDQC1    sql.NullString
 			GrosReservoir  sql.NullString
 			PetitReservoir sql.NullString
+			// Nouveaux produits (NULL possible pour les anciennes dates): [0]=prix, [1]=gros, [2]=petit
+			coloreB, colore40, mazoutInt, mazoutExt [3]sql.NullString
 		)
-		if err := rows.Scan(&Date, &PrixULSDQC1, &GrosReservoir, &PetitReservoir); err != nil {
+		if err := rows.Scan(&Date, &PrixULSDQC1, &GrosReservoir, &PetitReservoir,
+			&coloreB[0], &coloreB[1], &coloreB[2],
+			&colore40[0], &colore40[1], &colore40[2],
+			&mazoutInt[0], &mazoutInt[1], &mazoutInt[2],
+			&mazoutExt[0], &mazoutExt[1], &mazoutExt[2]); err != nil {
 			http.Error(w, "scan error: "+err.Error(), 500)
 			logger.Info("Scan error on rampeAllHandler: " + err.Error())
 			return
@@ -2649,6 +2673,19 @@ func rampeAllHandler(w http.ResponseWriter, r *http.Request) {
 			PrixULSDQC1:    (PrixULSDQC1.String),
 			GrosReservoir:  (GrosReservoir.String),
 			PetitReservoir: (PetitReservoir.String),
+
+			ColoreB:        coloreB[0].String,
+			ColoreBGros:    coloreB[1].String,
+			ColoreBPetit:   coloreB[2].String,
+			Colore40:       colore40[0].String,
+			Colore40Gros:   colore40[1].String,
+			Colore40Petit:  colore40[2].String,
+			MazoutInt:      mazoutInt[0].String,
+			MazoutIntGros:  mazoutInt[1].String,
+			MazoutIntPetit: mazoutInt[2].String,
+			MazoutExt:      mazoutExt[0].String,
+			MazoutExtGros:  mazoutExt[1].String,
+			MazoutExtPetit: mazoutExt[2].String,
 		})
 	}
 	if err := rows.Err(); err != nil {
